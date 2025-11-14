@@ -1,0 +1,8 @@
+{
+  "name": "GeoCam",
+  "description": "A modern, responsive camera web application that overlays real-time geographic coordinates onto the camera feed, mimicking the user interface of a native mobile camera.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
