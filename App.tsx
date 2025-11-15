@@ -215,89 +215,128 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facingMode, view]);
 
+  // State to track geolocation status
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
+
   useEffect(() => {
-    let watchId: number | null = null;
+    let updateLocationInterval: number | null = null;
+    let initialTimeout: number | null = null;
 
     const initGeolocation = async () => {
+      setGeoStatus('requesting');
+
       const permissionStatus = await checkGeolocationPermission();
       setGeoPermissionStatus(permissionStatus);
 
       if (permissionStatus === 'denied') {
+        setGeoStatus('error');
         setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
         // Store null coordinates when permission is denied
         captureLocationRef.current = null;
         return;
       } else if (permissionStatus === 'unsupported') {
+        setGeoStatus('error');
         setGeoError('Geolocation tidak didukung oleh browser ini.');
         // Store null coordinates when not supported
         captureLocationRef.current = null;
         return;
       }
 
-      // If permission is granted or prompt, try to start watching position
-      // Function to start watching position
-      const startGeolocationWatch = () => {
-        // First, try to get a quick location with shorter timeout
-        geoTimeoutRef.current = window.setTimeout(() => {
-          if (!hasReceivedLocationRef.current) {
-            setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
-          }
-        }, 10000); // 10 second timeout for initial location
+      // Define fetchLocation before using it
+      const fetchLocation = async () => {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 7000,      // 7 seconds for subsequent updates
+              maximumAge: 10000   // Use cached position up to 10 seconds old
+            });
+          });
 
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            if (geoTimeoutRef.current) {
-              clearTimeout(geoTimeoutRef.current); // Clear the timeout when we get a location
-              geoTimeoutRef.current = null;
-            }
-            hasReceivedLocationRef.current = true;
-            setGeoError(null); // Clear any previous error once we get a location
+          hasReceivedLocationRef.current = true;
+          setGeoStatus('success');
+          setGeoError(null);
 
-            const coords = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-            };
+          const coords = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
 
-            setCurrentCoords(coords);
-            // Store the current coordinates for capture
-            captureLocationRef.current = coords;
-          },
-          (err) => {
-            if (geoTimeoutRef.current) {
-              clearTimeout(geoTimeoutRef.current); // Clear the timeout on error
-              geoTimeoutRef.current = null;
-            }
-            hasReceivedLocationRef.current = true; // Prevent the timeout from showing an error later
-            console.error("Error getting geolocation:", err);
-
-            // Update permission status if error is due to permission
+          setCurrentCoords(coords);
+          captureLocationRef.current = coords;
+        } catch (err: any) {
+          // Only update error state if it's a new error (don't override existing good location)
+          if (!captureLocationRef.current) {
+            setGeoStatus('error');
             if (err.code === err.PERMISSION_DENIED) {
               setGeoPermissionStatus('denied');
               setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
-              // Store null coordinates when permission is denied
-              captureLocationRef.current = null;
+            } else if (err.code === err.TIMEOUT) {
+              // Don't show timeout error if we already have a location
+              if (!currentCoords) {
+                setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+              }
             } else {
               setGeoError(`Kesalahan geolokasi: ${err.message}.`);
-              // Store null coordinates when there's an error
-              captureLocationRef.current = null;
             }
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 15000,      // Increased timeout to 15 seconds
-            maximumAge: 10000    // Accept cached positions up to 10 seconds old (reduced from 30s for more fresh data)
+            captureLocationRef.current = null;
           }
-        );
+        }
       };
 
-      // Start watching position if permission is granted
-      if (permissionStatus === 'granted') {
-        startGeolocationWatch();
-      } else if (permissionStatus === 'prompt') {
-        // If permission status is prompt, the user will be asked when we make the first watchPosition call
-        startGeolocationWatch();
-      }
+      // Try to get the initial location
+      const fetchInitialLocation = async () => {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              timeout: 10000,     // 10 seconds for initial position
+              maximumAge: 0       // Don't use cached position for initial fetch
+            });
+          });
+
+          hasReceivedLocationRef.current = true;
+          setGeoStatus('success');
+          setGeoError(null);
+
+          const coords = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          };
+
+          setCurrentCoords(coords);
+          captureLocationRef.current = coords;
+
+          // Start periodic updates after initial success
+          if (updateLocationInterval) {
+            clearInterval(updateLocationInterval);
+          }
+          updateLocationInterval = window.setInterval(fetchLocation, 10000); // Update every 10 seconds
+        } catch (err: any) {
+          setGeoStatus('error');
+          if (err.code === err.PERMISSION_DENIED) {
+            setGeoPermissionStatus('denied');
+            setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+          } else if (err.code === err.TIMEOUT) {
+            setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+          } else {
+            setGeoError(`Kesalahan geolokasi: ${err.message}.`);
+          }
+          captureLocationRef.current = null;
+        }
+      };
+
+      // Start with initial location fetch
+      initialTimeout = window.setTimeout(() => {
+        if (!hasReceivedLocationRef.current) {
+          setGeoStatus('error');
+          setGeoError('Tidak dapat mendapatkan lokasi dalam batas waktu. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+        }
+      }, 15000); // 15 seconds for initial timeout
+
+      await fetchInitialLocation();
     };
 
     initGeolocation();
@@ -305,65 +344,57 @@ const App: React.FC = () => {
     // Listen for visibility change to handle app going to background/foreground
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // When app comes back to foreground, restart geolocation if permission allows
-        if (watchId) {
-          navigator.geolocation.clearWatch(watchId);
-        }
+        // When app comes back to foreground, refresh location if permission allows
         checkGeolocationPermission()
           .then(permissionStatus => {
-            if (permissionStatus === 'granted' || permissionStatus === 'prompt') {
-              const startGeolocationWatch = () => {
-                watchId = navigator.geolocation.watchPosition(
-                  (position) => {
-                    if (geoTimeoutRef.current) {
-                      clearTimeout(geoTimeoutRef.current);
-                      geoTimeoutRef.current = null;
-                    }
-                    hasReceivedLocationRef.current = true;
-                    setGeoError(null);
+            if (permissionStatus === 'granted') {
+              // Clear any existing interval before creating a new one
+              if (updateLocationInterval) {
+                clearInterval(updateLocationInterval);
+              }
+              // Define an updated fetchLocation function to update location when app comes to foreground
+              const fetchLocation = async () => {
+                try {
+                  const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                      enableHighAccuracy: true,
+                      timeout: 10000,
+                      maximumAge: 10000
+                    });
+                  });
 
-                    const coords = {
-                      latitude: position.coords.latitude,
-                      longitude: position.coords.longitude,
-                      accuracy: position.coords.accuracy,
-                    };
+                  hasReceivedLocationRef.current = true;
+                  setGeoStatus('success');
+                  setGeoError(null);
 
-                    setCurrentCoords(coords);
-                    captureLocationRef.current = coords;
-                  },
-                  (err) => {
-                    if (geoTimeoutRef.current) {
-                      clearTimeout(geoTimeoutRef.current);
-                      geoTimeoutRef.current = null;
-                    }
-                    hasReceivedLocationRef.current = true;
-                    console.error("Error getting geolocation:", err);
+                  const coords = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy,
+                  };
 
+                  setCurrentCoords(coords);
+                  captureLocationRef.current = coords;
+                } catch (err: any) {
+                  if (!captureLocationRef.current) {
                     if (err.code === err.PERMISSION_DENIED) {
                       setGeoPermissionStatus('denied');
                       setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
-                      captureLocationRef.current = null;
                     } else {
                       setGeoError(`Kesalahan geolokasi: ${err.message}.`);
-                      captureLocationRef.current = null;
                     }
-                  },
-                  {
-                    enableHighAccuracy: true,
-                    timeout: 15000,
-                    maximumAge: 10000
                   }
-                );
+                }
               };
 
-              startGeolocationWatch();
+              updateLocationInterval = window.setInterval(fetchLocation, 10000); // Update every 10 seconds
             }
           });
       } else {
-        // When app goes to background, stop geolocation to save battery
-        if (watchId) {
-          navigator.geolocation.clearWatch(watchId);
-          watchId = null;
+        // When app goes to background, stop location updates to save battery
+        if (updateLocationInterval) {
+          clearInterval(updateLocationInterval);
+          updateLocationInterval = null;
         }
       }
     };
@@ -371,11 +402,11 @@ const App: React.FC = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (geoTimeoutRef.current) {
-        clearTimeout(geoTimeoutRef.current);
+      if (initialTimeout) {
+        clearTimeout(initialTimeout);
       }
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
+      if (updateLocationInterval) {
+        clearInterval(updateLocationInterval);
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -543,7 +574,17 @@ const App: React.FC = () => {
                 alert("Simpan otomatis gagal. Lihat konsol untuk detail.");
             }
         } else {
-            alert("Tidak dapat menyimpan otomatis: data lokasi tidak tersedia.");
+            // Fallback: ask user if they want to save without location
+            const saveWithoutLocation = window.confirm("Tidak dapat mendapatkan lokasi. Simpan tanpa informasi lokasi?");
+            if (saveWithoutLocation) {
+                await addMedia('photo', imageDataUrl, {
+                  latitude: -1,  // Indicate invalid/unavailable location
+                  longitude: -1,
+                  accuracy: null
+                });
+                setShowSaveToast(true);
+                setTimeout(() => setShowSaveToast(false), 2000);
+            }
         }
     } else {
         setCapturedImage(imageDataUrl);
@@ -570,9 +611,14 @@ const App: React.FC = () => {
   };
 
   const refreshGeolocation = useCallback(async () => {
+    setGeoStatus('requesting');
+    setGeoError(null);
+
     if (!navigator.geolocation) {
+      setGeoStatus('error');
       setGeoError('Geolocation tidak didukung oleh browser ini.');
       setGeoPermissionStatus('unsupported');
+      captureLocationRef.current = null;
       return;
     }
 
@@ -581,34 +627,51 @@ const App: React.FC = () => {
     setGeoPermissionStatus(permissionStatus);
 
     if (permissionStatus === 'denied') {
+      setGeoStatus('error');
       setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
       captureLocationRef.current = null;
       return;
     } else if (permissionStatus === 'unsupported') {
+      setGeoStatus('error');
       setGeoError('Geolocation tidak didukung oleh browser ini.');
       captureLocationRef.current = null;
       return;
     }
 
-    // Clear previous error
-    setGeoError(null);
+    // Try to get fresh location
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
 
-    // Reset the flag to allow timeout error again
-    hasReceivedLocationRef.current = false;
+      hasReceivedLocationRef.current = true;
+      setGeoStatus('success');
+      setGeoError(null);
 
-    // Set a new timeout for location retrieval
-    if (geoTimeoutRef.current) {
-      clearTimeout(geoTimeoutRef.current);
-    }
+      const coords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
 
-    geoTimeoutRef.current = window.setTimeout(() => {
-      if (!hasReceivedLocationRef.current) {
+      setCurrentCoords(coords);
+      captureLocationRef.current = coords;
+    } catch (err: any) {
+      setGeoStatus('error');
+      if (err.code === err.PERMISSION_DENIED) {
+        setGeoPermissionStatus('denied');
+        setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+      } else if (err.code === err.TIMEOUT) {
         setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+      } else {
+        setGeoError(`Kesalahan geolokasi: ${err.message}.`);
       }
-    }, 10000);
-
-    // We're already watching position in the effect, so we just need to try to get a fresh location
-    // The watchPosition will update currentCoords and captureLocationRef.current
+      captureLocationRef.current = null;
+    }
   }, [setGeoError, checkGeolocationPermission]);
 
   const handleFlipCamera = () => {
@@ -669,7 +732,17 @@ const App: React.FC = () => {
                     URL.revokeObjectURL(videoUrl);
                 }
             } else {
-                alert("Tidak dapat menyimpan otomatis: data lokasi tidak tersedia.");
+                // Fallback: ask user if they want to save without location
+                const saveWithoutLocation = window.confirm("Tidak dapat mendapatkan lokasi. Simpan tanpa informasi lokasi?");
+                if (saveWithoutLocation) {
+                    await addMedia('video', videoBlob, {
+                      latitude: -1,  // Indicate invalid/unavailable location
+                      longitude: -1,
+                      accuracy: null
+                    });
+                    setShowSaveToast(true);
+                    setTimeout(() => setShowSaveToast(false), 2000);
+                }
                 URL.revokeObjectURL(videoUrl);
             }
         } else {
@@ -873,32 +946,50 @@ const App: React.FC = () => {
             </div>
 
             {/* Coordinate display moved to top toolbar */}
-            {currentCoords && !capturedImage && !capturedVideoUrl && geoPermissionStatus !== 'denied' && (
+            {!capturedImage && !capturedVideoUrl && (
               <div className="mt-2 w-full max-w-md mx-auto flex flex-col items-center">
-                <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs">
-                  <div className={`w-3 h-3 rounded-full ${getAccuracyIndicatorClasses(currentCoords.accuracy)}`}></div>
-                  <span className="font-mono text-sm truncate">{renderWatermarkText(currentCoords)}</span>
-                </div>
-                {currentCoords.accuracy !== null && (
-                  <div className="mt-1 text-xs text-white/80 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full">
-                    Akurasi: {currentCoords.accuracy.toFixed(1)}m
+                {geoStatus === 'requesting' && (
+                  <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse"></div>
+                    <span className="font-mono text-sm">Mendapatkan lokasi...</span>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Show permission request guidance when location permission is denied */}
-            {geoPermissionStatus === 'denied' && !capturedImage && !capturedVideoUrl && (
-              <div className="mt-2 w-full max-w-md mx-auto flex flex-col items-center p-3">
-                <div className="bg-red-600/80 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <LocationMarkerIcon className="w-4 h-4"/>
-                    <span className="font-mono text-sm">Izin lokasi ditolak</span>
+                {currentCoords && geoPermissionStatus !== 'denied' && geoStatus === 'success' && (
+                  <div className="flex flex-col items-center w-full">
+                    <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs">
+                      <div className={`w-3 h-3 rounded-full ${getAccuracyIndicatorClasses(currentCoords.accuracy)}`}></div>
+                      <span className="font-mono text-sm truncate">{renderWatermarkText(currentCoords)}</span>
+                    </div>
+                    {currentCoords.accuracy !== null && (
+                      <div className="mt-1 text-xs text-white/80 bg-black/30 backdrop-blur-sm px-3 py-1 rounded-full">
+                        Akurasi: {currentCoords.accuracy.toFixed(1)}m
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="mt-2 text-xs text-white/80 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-full text-center">
-                  Aktifkan izin lokasi untuk menambahkan koordinat ke foto/video Anda
-                </div>
+                )}
+
+                {/* Show permission request guidance when location permission is denied */}
+                {geoPermissionStatus === 'denied' && (
+                  <div className="flex flex-col items-center p-3 w-full max-w-xs">
+                    <div className="bg-red-600/80 backdrop-blur-sm px-4 py-3 rounded-full w-full">
+                      <div className="flex items-center justify-center gap-2">
+                        <LocationMarkerIcon className="w-4 h-4"/>
+                        <span className="font-mono text-sm">Izin lokasi ditolak</span>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-white/80 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-full text-center">
+                      Aktifkan izin lokasi untuk menambahkan koordinat ke foto/video Anda
+                    </div>
+                  </div>
+                )}
+
+                {geoStatus === 'error' && geoPermissionStatus !== 'denied' && !currentCoords && (
+                  <div className="flex items-center gap-2 bg-red-600/80 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs">
+                    <LocationMarkerIcon className="w-4 h-4"/>
+                    <span className="font-mono text-sm truncate">Gagal mendapatkan lokasi</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
