@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Placeholder Icon</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f59e0b; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="iconCanvas" width="512" height="512"></canvas>
+    <script>
+        const canvas = document.getElementById('iconCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Draw background
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(0, 0, 512, 512);
+        
+        // Draw camera icon
+        ctx.fillStyle = '#1f2937';
+        ctx.fillRect(64, 160, 384, 240); // Body
+        ctx.beginPath();
+        ctx.arc(256, 256, 80, 0, Math.PI * 2); // Lens
+        ctx.fill();
+        
+        // Draw details
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(186, 200, 15, 0, Math.PI * 2); // Left eye
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(326, 200, 15, 0, Math.PI * 2); // Right eye
+        ctx.fill();
+        ctx.beginPath(); // Smile
+        ctx.arc(256, 300, 40, 0, Math.PI, false);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 8;
+        ctx.stroke();
+        
+        // Save as PNG
+        const link = document.createElement('a');
+        link.download = 'icon-512.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    </script>
+</body>
+</html>
