@@ -20,6 +20,10 @@ export interface AppSettings {
   watermarkPosition: WatermarkPosition;
   autoSave: boolean;
   watermarkText: string;
+  fontSize2: number;
+  watermarkPosition2: WatermarkPosition;
+  watermarkText2: string;
+  enableWatermark2: boolean;
 }
 
 type Coordinates = {
@@ -55,8 +59,13 @@ const App: React.FC = () => {
     watermarkPosition: 'top-left',
     autoSave: false,
     watermarkText: '{{lat}}, {{lng}}',
+    fontSize2: 12,
+    watermarkPosition2: 'bottom-right',
+    watermarkText2: '{{acc}}',
+    enableWatermark2: false,
   });
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [geoPermissionStatus, setGeoPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'unsupported' | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,6 +76,67 @@ const App: React.FC = () => {
   const geoWatchRef = useRef<number | null>(null); // To store the watchPosition ID
   const geoTimeoutRef = useRef<number | null>(null); // To store the timeout ID
   const hasReceivedLocationRef = useRef(false); // To track if we've received a location
+
+  // Store the location at the time of capture
+  const captureLocationRef = useRef<Coordinates | null>(null);
+
+  // Function to check geolocation permission status
+  const checkGeolocationPermission = useCallback(async (): Promise<'granted' | 'denied' | 'prompt' | 'unsupported'> => {
+    if (!navigator.geolocation) {
+      return 'unsupported';
+    }
+
+    // Modern browsers support the Permissions API
+    if (navigator.permissions) {
+      try {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        return permission.state as 'granted' | 'denied' | 'prompt';
+      } catch (error) {
+        // If the query method fails, we'll try an alternative approach
+        console.warn('Permissions API not supported, using alternative method');
+      }
+    }
+
+    // For browsers that don't support the Permissions API
+    // We can only assume 'prompt' state since we can't know without requesting
+    return 'prompt';
+  }, []);
+
+  // Function to get current position with retry capability using getCurrentPosition
+  const getCurrentLocation = useCallback((maxRetries = 3): Promise<Coordinates> => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+
+      const attemptGeolocation = () => {
+        attempts++;
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            });
+          },
+          (error) => {
+            if (attempts < maxRetries) {
+              // Wait a bit before retrying
+              setTimeout(attemptGeolocation, 2000);
+            } else {
+              reject(error);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+          }
+        );
+      };
+
+      attemptGeolocation();
+    });
+  }, []);
 
   // Load settings from localStorage on initial load
   useEffect(() => {
@@ -146,57 +216,170 @@ const App: React.FC = () => {
   }, [facingMode, view]);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGeoError('Geolocation tidak didukung oleh browser ini.');
-      return;
-    }
+    let watchId: number | null = null;
 
-    // First, try to get a quick location with shorter timeout
-    geoTimeoutRef.current = window.setTimeout(() => {
-      if (!hasReceivedLocationRef.current) {
-        setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
-      }
-    }, 10000); // 10 second timeout for initial location
+    const initGeolocation = async () => {
+      const permissionStatus = await checkGeolocationPermission();
+      setGeoPermissionStatus(permissionStatus);
 
-    geoWatchRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        if (geoTimeoutRef.current) {
-          clearTimeout(geoTimeoutRef.current); // Clear the timeout when we get a location
-          geoTimeoutRef.current = null;
-        }
-        hasReceivedLocationRef.current = true;
-        setGeoError(null); // Clear any previous error once we get a location
-        setCurrentCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        });
-      },
-      (err) => {
-        if (geoTimeoutRef.current) {
-          clearTimeout(geoTimeoutRef.current); // Clear the timeout on error
-          geoTimeoutRef.current = null;
-        }
-        hasReceivedLocationRef.current = true; // Prevent the timeout from showing an error later
-        console.error("Error getting geolocation:", err);
-        setGeoError(`Kesalahan geolokasi: ${err.message}.`);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,      // Increased timeout to 15 seconds
-        maximumAge: 30000    // Accept cached positions up to 30 seconds old
+      if (permissionStatus === 'denied') {
+        setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+        // Store null coordinates when permission is denied
+        captureLocationRef.current = null;
+        return;
+      } else if (permissionStatus === 'unsupported') {
+        setGeoError('Geolocation tidak didukung oleh browser ini.');
+        // Store null coordinates when not supported
+        captureLocationRef.current = null;
+        return;
       }
-    );
+
+      // If permission is granted or prompt, try to start watching position
+      // Function to start watching position
+      const startGeolocationWatch = () => {
+        // First, try to get a quick location with shorter timeout
+        geoTimeoutRef.current = window.setTimeout(() => {
+          if (!hasReceivedLocationRef.current) {
+            setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+          }
+        }, 10000); // 10 second timeout for initial location
+
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            if (geoTimeoutRef.current) {
+              clearTimeout(geoTimeoutRef.current); // Clear the timeout when we get a location
+              geoTimeoutRef.current = null;
+            }
+            hasReceivedLocationRef.current = true;
+            setGeoError(null); // Clear any previous error once we get a location
+
+            const coords = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            };
+
+            setCurrentCoords(coords);
+            // Store the current coordinates for capture
+            captureLocationRef.current = coords;
+          },
+          (err) => {
+            if (geoTimeoutRef.current) {
+              clearTimeout(geoTimeoutRef.current); // Clear the timeout on error
+              geoTimeoutRef.current = null;
+            }
+            hasReceivedLocationRef.current = true; // Prevent the timeout from showing an error later
+            console.error("Error getting geolocation:", err);
+
+            // Update permission status if error is due to permission
+            if (err.code === err.PERMISSION_DENIED) {
+              setGeoPermissionStatus('denied');
+              setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+              // Store null coordinates when permission is denied
+              captureLocationRef.current = null;
+            } else {
+              setGeoError(`Kesalahan geolokasi: ${err.message}.`);
+              // Store null coordinates when there's an error
+              captureLocationRef.current = null;
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,      // Increased timeout to 15 seconds
+            maximumAge: 10000    // Accept cached positions up to 10 seconds old (reduced from 30s for more fresh data)
+          }
+        );
+      };
+
+      // Start watching position if permission is granted
+      if (permissionStatus === 'granted') {
+        startGeolocationWatch();
+      } else if (permissionStatus === 'prompt') {
+        // If permission status is prompt, the user will be asked when we make the first watchPosition call
+        startGeolocationWatch();
+      }
+    };
+
+    initGeolocation();
+
+    // Listen for visibility change to handle app going to background/foreground
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // When app comes back to foreground, restart geolocation if permission allows
+        if (watchId) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+        checkGeolocationPermission()
+          .then(permissionStatus => {
+            if (permissionStatus === 'granted' || permissionStatus === 'prompt') {
+              const startGeolocationWatch = () => {
+                watchId = navigator.geolocation.watchPosition(
+                  (position) => {
+                    if (geoTimeoutRef.current) {
+                      clearTimeout(geoTimeoutRef.current);
+                      geoTimeoutRef.current = null;
+                    }
+                    hasReceivedLocationRef.current = true;
+                    setGeoError(null);
+
+                    const coords = {
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                      accuracy: position.coords.accuracy,
+                    };
+
+                    setCurrentCoords(coords);
+                    captureLocationRef.current = coords;
+                  },
+                  (err) => {
+                    if (geoTimeoutRef.current) {
+                      clearTimeout(geoTimeoutRef.current);
+                      geoTimeoutRef.current = null;
+                    }
+                    hasReceivedLocationRef.current = true;
+                    console.error("Error getting geolocation:", err);
+
+                    if (err.code === err.PERMISSION_DENIED) {
+                      setGeoPermissionStatus('denied');
+                      setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+                      captureLocationRef.current = null;
+                    } else {
+                      setGeoError(`Kesalahan geolokasi: ${err.message}.`);
+                      captureLocationRef.current = null;
+                    }
+                  },
+                  {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 10000
+                  }
+                );
+              };
+
+              startGeolocationWatch();
+            }
+          });
+      } else {
+        // When app goes to background, stop geolocation to save battery
+        if (watchId) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       if (geoTimeoutRef.current) {
         clearTimeout(geoTimeoutRef.current);
       }
-      if (geoWatchRef.current) {
-        navigator.geolocation.clearWatch(geoWatchRef.current);
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [checkGeolocationPermission]);
 
   const resetCaptureState = () => {
     setCapturedImage(null);
@@ -208,10 +391,13 @@ const App: React.FC = () => {
     setCapturedVideoUrl(null);
   };
   
-  const renderWatermarkText = useCallback((coords: Coordinates | null): string => {
-    if (!coords || !settings.watermarkText) return '';
-    
-    let text = settings.watermarkText
+  const renderWatermarkText = useCallback((coords: Coordinates | null, watermarkIndex: number = 1): string => {
+    if (!coords) return '';
+
+    const textTemplate = watermarkIndex === 1 ? settings.watermarkText : settings.watermarkText2;
+    if (!textTemplate) return '';
+
+    let text = textTemplate
       .replace(/{{lat}}/g, coords.latitude.toFixed(5))
       .replace(/{{lng}}/g, coords.longitude.toFixed(5));
 
@@ -221,79 +407,28 @@ const App: React.FC = () => {
         // Remove the placeholder and any surrounding whitespace if no accuracy is available
         text = text.replace(/\s*{{acc}}\s*/g, '').trim();
     }
-    
+
     return text;
-  }, [settings.watermarkText]);
+  }, [settings.watermarkText, settings.watermarkText2]);
 
 
   const drawWatermark = (ctx: CanvasRenderingContext2D, coords: Coordinates) => {
+    // Draw first watermark
     const { fontSize, watermarkPosition } = settings;
-    const text = renderWatermarkText(coords);
-    if (!text) return;
+    const text1 = renderWatermarkText(coords, 1);
 
-    const padding = 10;
-    const accuracyFontSize = fontSize * 0.7; // Smaller font for accuracy text
+    if (text1) {
+      const padding = 10;
 
-    // Draw main coordinate text
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.lineWidth = 2;
-
-    const textMetrics = ctx.measureText(text);
-
-    // Draw accuracy text if available
-    let yAdjustment = 0;
-    if (coords.accuracy !== null) {
-      ctx.font = `bold ${accuracyFontSize}px sans-serif`;
-      const accuracyText = `Akurasi: ${coords.accuracy.toFixed(1)}m`;
-      const accuracyMetrics = ctx.measureText(accuracyText);
-
-      // Switch back to main font for measuring main text position
+      // Draw first watermark
       ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.lineWidth = 2;
+
+      const textMetrics = ctx.measureText(text1);
 
       // Calculate positions based on watermark position
-      let x, y, accuracyX, accuracyY;
-
-      switch (watermarkPosition) {
-        case 'top-right':
-          x = ctx.canvas.width - textMetrics.width - padding;
-          y = fontSize + padding;
-          accuracyX = ctx.canvas.width - accuracyMetrics.width - padding;
-          accuracyY = y + fontSize + 5; // Position below main text
-          break;
-        case 'bottom-left':
-          x = padding;
-          y = ctx.canvas.height - padding;
-          accuracyX = padding;
-          accuracyY = y - fontSize - 5; // Position above main text (since y is bottom-aligned)
-          yAdjustment = -accuracyFontSize; // Adjust main text upward
-          break;
-        case 'bottom-right':
-          x = ctx.canvas.width - textMetrics.width - padding;
-          y = ctx.canvas.height - padding;
-          accuracyX = ctx.canvas.width - accuracyMetrics.width - padding;
-          accuracyY = y - fontSize - 5; // Position above main text
-          yAdjustment = -accuracyFontSize; // Adjust main text upward
-          break;
-        case 'top-left':
-        default:
-          x = padding;
-          y = fontSize + padding;
-          accuracyX = padding;
-          accuracyY = y + fontSize + 5; // Position below main text
-          break;
-      }
-
-      // Draw accuracy text with stroke and fill
-      ctx.font = `bold ${accuracyFontSize}px sans-serif`;
-      ctx.strokeText(accuracyText, accuracyX, accuracyY);
-      ctx.fillText(accuracyText, accuracyX, accuracyY);
-
-      // Switch back to main font
-      ctx.font = `bold ${fontSize}px sans-serif`;
-    } else {
-      // Calculate positions for main text only
       let x, y;
 
       switch (watermarkPosition) {
@@ -315,11 +450,56 @@ const App: React.FC = () => {
           y = fontSize + padding;
           break;
       }
+
+      // Draw first watermark text with stroke and fill
+      ctx.strokeText(text1, x, y);
+      ctx.fillText(text1, x, y);
     }
 
-    // Draw main coordinate text with stroke and fill
-    ctx.strokeText(text, x, y + yAdjustment);
-    ctx.fillText(text, x, y + yAdjustment);
+    // Draw second watermark if enabled
+    if (settings.enableWatermark2) {
+      const text2 = renderWatermarkText(coords, 2);
+
+      if (text2) {
+        const { fontSize2, watermarkPosition2 } = settings;
+        const padding = 10;
+
+        // Draw second watermark
+        ctx.font = `bold ${fontSize2}px sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
+
+        const textMetrics2 = ctx.measureText(text2);
+
+        // Calculate positions based on second watermark position
+        let x2, y2;
+
+        switch (watermarkPosition2) {
+          case 'top-right':
+            x2 = ctx.canvas.width - textMetrics2.width - padding;
+            y2 = fontSize2 + padding;
+            break;
+          case 'bottom-left':
+            x2 = padding;
+            y2 = ctx.canvas.height - padding;
+            break;
+          case 'bottom-right':
+            x2 = ctx.canvas.width - textMetrics2.width - padding;
+            y2 = ctx.canvas.height - padding;
+            break;
+          case 'top-left':
+          default:
+            x2 = padding;
+            y2 = fontSize2 + padding;
+            break;
+        }
+
+        // Draw second watermark text with stroke and fill
+        ctx.strokeText(text2, x2, y2);
+        ctx.fillText(text2, x2, y2);
+      }
+    }
   };
 
   const handleTakePhoto = async () => {
@@ -330,19 +510,32 @@ const App: React.FC = () => {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    if (currentCoords) {
-      drawWatermark(ctx, currentCoords);
+    // Use the coordinates captured at the time of photo capture
+    const coordsForCapture = captureLocationRef.current;
+    if (coordsForCapture) {
+      drawWatermark(ctx, coordsForCapture);
     }
 
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
     if (settings.autoSave) {
-        if (currentCoords) {
+        // Wait briefly for location data if not available yet
+        let locationData = coordsForCapture;
+        if (!locationData && geoPermissionStatus !== 'denied') {
+          try {
+            // Wait up to 2 seconds for location data
+            locationData = await getCurrentLocation(2); // max 2 attempts
+          } catch (err) {
+            console.warn("Could not get location for photo:", err);
+          }
+        }
+
+        if (locationData) {
             try {
-                await addMedia('photo', imageDataUrl, currentCoords);
+                await addMedia('photo', imageDataUrl, locationData);
                 setShowSaveToast(true);
                 setTimeout(() => setShowSaveToast(false), 2000);
             } catch (err) {
@@ -354,7 +547,7 @@ const App: React.FC = () => {
         }
     } else {
         setCapturedImage(imageDataUrl);
-        setCapturedCoords(currentCoords);
+        setCapturedCoords(coordsForCapture);
     }
   };
 
@@ -375,14 +568,59 @@ const App: React.FC = () => {
       setIsSaving(false);
     }
   };
-  
+
+  const refreshGeolocation = useCallback(async () => {
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation tidak didukung oleh browser ini.');
+      setGeoPermissionStatus('unsupported');
+      return;
+    }
+
+    // Check current permission status
+    const permissionStatus = await checkGeolocationPermission();
+    setGeoPermissionStatus(permissionStatus);
+
+    if (permissionStatus === 'denied') {
+      setGeoError('Izin lokasi ditolak. Silakan aktifkan izin lokasi dari pengaturan browser Anda.');
+      captureLocationRef.current = null;
+      return;
+    } else if (permissionStatus === 'unsupported') {
+      setGeoError('Geolocation tidak didukung oleh browser ini.');
+      captureLocationRef.current = null;
+      return;
+    }
+
+    // Clear previous error
+    setGeoError(null);
+
+    // Reset the flag to allow timeout error again
+    hasReceivedLocationRef.current = false;
+
+    // Set a new timeout for location retrieval
+    if (geoTimeoutRef.current) {
+      clearTimeout(geoTimeoutRef.current);
+    }
+
+    geoTimeoutRef.current = window.setTimeout(() => {
+      if (!hasReceivedLocationRef.current) {
+        setGeoError('Tidak dapat mendapatkan lokasi saat ini. Pastikan izin lokasi diaktifkan dan sinyal GPS memadai.');
+      }
+    }, 10000);
+
+    // We're already watching position in the effect, so we just need to try to get a fresh location
+    // The watchPosition will update currentCoords and captureLocationRef.current
+  }, [setGeoError, checkGeolocationPermission]);
+
   const handleFlipCamera = () => {
     setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
   };
 
   const startRecording = () => {
     if (!stream || isRecording) return;
-    
+
+    // Capture the location at the start of recording
+    const recordingLocation = captureLocationRef.current;
+
     setIsRecording(true);
     setRecordingDuration(0);
     timerIntervalRef.current = window.setInterval(() => {
@@ -408,9 +646,20 @@ const App: React.FC = () => {
         const videoUrl = URL.createObjectURL(videoBlob);
 
         if (settings.autoSave) {
-            if (currentCoords) {
+            // Wait briefly for location data if not available yet
+            let locationData = recordingLocation;
+            if (!locationData && geoPermissionStatus !== 'denied') {
+              try {
+                // Wait up to 2 seconds for location data
+                locationData = await getCurrentLocation(2); // max 2 attempts
+              } catch (err) {
+                console.warn("Could not get location for video:", err);
+              }
+            }
+
+            if (locationData) {
                 try {
-                    await addMedia('video', videoBlob, currentCoords);
+                    await addMedia('video', videoBlob, locationData);
                     setShowSaveToast(true);
                     setTimeout(() => setShowSaveToast(false), 2000);
                 } catch (err) {
@@ -426,7 +675,7 @@ const App: React.FC = () => {
         } else {
             setCapturedVideoBlob(videoBlob);
             setCapturedVideoUrl(videoUrl);
-            setCapturedCoords(currentCoords);
+            setCapturedCoords(locationData);
         }
       };
 
@@ -624,7 +873,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Coordinate display moved to top toolbar */}
-            {currentCoords && !capturedImage && !capturedVideoUrl && (
+            {currentCoords && !capturedImage && !capturedVideoUrl && geoPermissionStatus !== 'denied' && (
               <div className="mt-2 w-full max-w-md mx-auto flex flex-col items-center">
                 <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs">
                   <div className={`w-3 h-3 rounded-full ${getAccuracyIndicatorClasses(currentCoords.accuracy)}`}></div>
@@ -635,6 +884,21 @@ const App: React.FC = () => {
                     Akurasi: {currentCoords.accuracy.toFixed(1)}m
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Show permission request guidance when location permission is denied */}
+            {geoPermissionStatus === 'denied' && !capturedImage && !capturedVideoUrl && (
+              <div className="mt-2 w-full max-w-md mx-auto flex flex-col items-center p-3">
+                <div className="bg-red-600/80 backdrop-blur-sm px-4 py-3 rounded-full w-full max-w-xs text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <LocationMarkerIcon className="w-4 h-4"/>
+                    <span className="font-mono text-sm">Izin lokasi ditolak</span>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-white/80 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-full text-center">
+                  Aktifkan izin lokasi untuk menambahkan koordinat ke foto/video Anda
+                </div>
               </div>
             )}
           </div>
@@ -706,10 +970,37 @@ const App: React.FC = () => {
           )}
 
           {geoError && (
-              <div className="absolute bottom-40 left-1/2 -translate-x-1/2 bg-red-600/80 px-4 py-2 rounded-md text-sm text-center flex items-center gap-2">
-                  <LocationMarkerIcon className="w-4 h-4"/>
-                  {geoError}
+            <div className="absolute bottom-40 left-1/2 -translate-x-1/2 bg-red-600/80 px-4 py-2 rounded-md text-sm text-center">
+              <div className="flex items-center gap-2 mb-1">
+                <LocationMarkerIcon className="w-4 h-4"/>
+                {geoError}
               </div>
+
+              {geoPermissionStatus === 'denied' ? (
+                <div className="mt-1 text-xs">
+                  <p className="mb-1">Ikuti langkah-langkah berikut untuk mengaktifkan izin lokasi:</p>
+                  <ul className="list-disc list-inside text-left text-xs space-y-1">
+                    <li>Klik ikon gembok di sebelah kiri URL</li>
+                    <li>Pilih "Izin Situs"</li>
+                    <li>Cari "Lokasi"</li>
+                    <li>Pilih "Izinkan" atau "Tanyakan Saat Digunakan"</li>
+                  </ul>
+                  <button
+                    onClick={refreshGeolocation}
+                    className="mt-2 px-2 py-1 bg-white/20 rounded text-xs hover:bg-white/30"
+                  >
+                    Periksa Izin Lagi
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={refreshGeolocation}
+                  className="mt-1 px-2 py-1 bg-white/20 rounded text-xs hover:bg-white/30"
+                >
+                  Coba Lagi
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
