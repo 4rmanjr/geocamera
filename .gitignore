@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment variables
+.env.local
+.env.*.local
+.env
+
+# Capacitor specific (generated native project files)
+android/build/
+android/app/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
+android/gradle/wrapper/gradle-wrapper.jar
+
+# .genkit directory
+.genkit/
+
+# Project specific artifacts
+geocam-pro.zip
+metadata.json
+
+# IDEs and other ignored files
+.idea/
+.vscode/
+.DS_Store
+*~
+*.tmp
