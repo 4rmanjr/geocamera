@@ -1,7 +1,8 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { AppSettings, WatermarkPosition, WatermarkItemType, WatermarkSize } from '../types';
-import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from '../icons';
+import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ShareIcon, DownloadIcon, RefreshIcon } from '../icons';
+import { shareSettings, validateAndParseSettings, syncSettingsFromWeb } from '../utils/settings-import-export';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -40,11 +41,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateSettings,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  // Web Sync State
+  const [webUrl, setWebUrl] = useState('https://armanjr.my.id/geocam-settings.json');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!isOpen) return null;
 
   const handleChange = (key: keyof AppSettings, value: any) => {
     onUpdateSettings({ ...settings, [key]: value });
+  };
+
+  const handleExport = async () => {
+    try {
+      await shareSettings(settings);
+    } catch (err: any) {
+      alert("Gagal membagikan file: " + (err.message || err));
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const newSettings = validateAndParseSettings(content);
+        onUpdateSettings(newSettings);
+        alert("Pengaturan berhasil diimpor! Logo, posisi, dan teks telah diperbarui.");
+      } catch (err: any) {
+        alert("Gagal impor: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+    // Reset value to allow re-selecting same file
+    e.target.value = '';
+  };
+
+  const handleWebSync = async () => {
+    if (!webUrl) return;
+    setIsSyncing(true);
+    try {
+        const result = await syncSettingsFromWeb(webUrl);
+        if (result.success && result.settings) {
+            onUpdateSettings(result.settings);
+            alert(result.message);
+        } else {
+            alert(result.message);
+        }
+    } catch (e) {
+        alert("Terjadi kesalahan tidak terduga.");
+    } finally {
+        setIsSyncing(false);
+    }
   };
 
   const getItemPosition = (type: WatermarkItemType): WatermarkPosition => {
@@ -402,6 +454,63 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     Standard
                   </button>
                 </div>
+              </div>
+           </div>
+
+           <hr className="border-neutral-800" />
+           
+           {/* Section: Backup & Restore */}
+           <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-emerald-500 uppercase tracking-wider">Backup & Restore</h3>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handleExport}
+                  className="flex flex-col items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white py-4 rounded-lg transition"
+                >
+                  <ShareIcon className="w-6 h-6 text-blue-400" />
+                  <span className="text-xs font-medium">Backup / Export</span>
+                </button>
+
+                <button
+                  onClick={() => importFileRef.current?.click()}
+                  className="flex flex-col items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white py-4 rounded-lg transition"
+                >
+                  <DownloadIcon className="w-6 h-6 text-emerald-400" />
+                  <span className="text-xs font-medium">Restore / Import</span>
+                </button>
+                
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  className="hidden" 
+                  ref={importFileRef} 
+                  onChange={handleImportFile}
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 text-center">
+                Backup akan menyimpan file .json yang berisi semua konfigurasi termasuk logo.
+              </p>
+              
+              <div className="pt-2 border-t border-neutral-800 mt-2">
+                  <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Sinkronisasi Web</h4>
+                  <div className="flex gap-2">
+                      <input 
+                        type="url" 
+                        value={webUrl}
+                        onChange={(e) => setWebUrl(e.target.value)}
+                        placeholder="https://website.com/settings.json"
+                        className="flex-1 bg-neutral-800 text-white text-xs px-3 py-2 rounded border border-neutral-700 focus:border-emerald-500 outline-none"
+                      />
+                      <button 
+                        onClick={handleWebSync}
+                        disabled={isSyncing}
+                        className="bg-neutral-700 hover:bg-neutral-600 text-white px-3 py-2 rounded border border-neutral-600 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                        {isSyncing ? '...' : 'Sync'}
+                      </button>
+                  </div>
               </div>
            </div>
 

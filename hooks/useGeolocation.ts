@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation, PermissionStatus } from '@capacitor/geolocation';
 import { GeoLocationState } from '../types';
@@ -34,42 +34,79 @@ export const useGeolocation = ({ isEnabled }: UseGeoLocationProps) => {
     loading: false, 
     error: null
   });
-  const [watchId, setWatchId] = useState<string | null>(null);
+  
+  // Refs to track internal state without triggering re-renders for logic checks
+  const watchIdRef = useRef<string | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const currentAccuracyRef = useRef<number>(9999);
+
+  const updatePosition = useCallback((pos: any) => {
+      const now = Date.now();
+      const newAccuracy = pos.coords.accuracy;
+      const timeDiff = now - lastUpdateRef.current;
+
+      // LOGIC: SMART FILTERING
+      // 1. Always update if it's the first fix (or we have no data).
+      // 2. Always update if accuracy is better (smaller number is better).
+      // 3. Update if accuracy is 'Good Enough' (< 15m) to keep movement fluid.
+      // 4. Force update if data is stale (> 5 seconds) to avoid getting stuck on an old "perfect" point that is no longer valid.
+      
+      const isFirstFix = lastUpdateRef.current === 0;
+      const isBetterAccuracy = newAccuracy <= currentAccuracyRef.current;
+      const isGoodEnough = newAccuracy < 15; 
+      const isStale = timeDiff > 5000; 
+
+      if (isFirstFix || isBetterAccuracy || isGoodEnough || isStale) {
+          lastUpdateRef.current = now;
+          currentAccuracyRef.current = newAccuracy;
+
+          setGeoState({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: Math.round(newAccuracy), // Round for cleaner UI
+            loading: false,
+            error: null
+          });
+      }
+  }, []);
 
   const startLocationWatch = useCallback(() => {
-    if (watchId) return;
+    if (watchIdRef.current) return;
 
     setGeoState(prev => ({ ...prev, loading: true, error: null }));
-    
+    lastUpdateRef.current = 0; // Reset staleness check
+    currentAccuracyRef.current = 9999;
+
     Geolocation.watchPosition(
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 },
+      { 
+          enableHighAccuracy: true, // Force GPS/Hardware
+          timeout: 10000,           // Wait max 10s per fix attempt
+          maximumAge: 0             // CRITICAL: Do not use cached positions. Force fresh data.
+      },
       (pos, err) => {
         if (err) {
-          setGeoState(prev => ({ ...prev, loading: false, error: "Izin lokasi ditolak atau GPS mati." }));
+          // Only show error if we have NO data yet. If we have data, keep showing it while retrying silently.
+          if (lastUpdateRef.current === 0) {
+              setGeoState(prev => ({ ...prev, loading: false, error: "Mencari sinyal GPS..." }));
+          }
           return;
         }
         
         if (pos) {
-          setGeoState({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            loading: false,
-            error: null
-          });
+          updatePosition(pos);
         }
       }
     ).then(id => {
-      setWatchId(id);
+      watchIdRef.current = id;
     });
-  }, [watchId]);
+  }, [updatePosition]);
 
   const stopLocationWatch = useCallback(() => {
-      if (watchId) {
-          Geolocation.clearWatch({ id: watchId });
-          setWatchId(null);
+      if (watchIdRef.current) {
+          Geolocation.clearWatch({ id: watchIdRef.current });
+          watchIdRef.current = null;
       }
-  }, [watchId]);
+  }, []);
 
   useEffect(() => {
       if (isEnabled) {
