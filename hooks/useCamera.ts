@@ -127,7 +127,7 @@ export const useCamera = ({ isEnabled }: UseCameraProps) => {
   const captureImage = async (): Promise<string | null> => {
       if (isNative) {
           try {
-              const result = await CameraPreview.capture({ quality: 100, width: 0, height: 0 });
+              const result = await CameraPreview.capture({ quality: 90, width: 1920, height: 0 });
               return result.value; 
           } catch (e) {
               console.error("Native Capture Failed", e);

@@ -1,12 +1,9 @@
-
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, lazy, Suspense } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import { CheckIcon, SettingsIcon, FlashOffIcon, FlashOnIcon, FlashAutoIcon } from './icons';
 import { AppSettings, SavedPhoto } from './types';
 import { DEFAULT_SETTINGS } from './constants';
-import { SettingsModal } from './components/SettingsModal';
-import { GalleryModal } from './components/GalleryModal';
 import { HUDOverlay } from './components/HUDOverlay';
 import { CameraControls } from './components/CameraControls';
 
@@ -17,6 +14,11 @@ import { useGallery } from './hooks/useGallery';
 import { useCapture } from './hooks/useCapture';
 
 const SETTINGS_KEY = 'geoCamSettings_v1';
+
+// Lazy load modals
+const SettingsModal = lazy(() => import('./components/SettingsModal').then(module => ({ default: module.SettingsModal })));
+const GalleryModal = lazy(() => import('./components/GalleryModal').then(module => ({ default: module.GalleryModal })));
+
 
 // Helper to safely load and merge settings
 const loadSettings = async (): Promise<AppSettings> => {
@@ -216,21 +218,26 @@ const App = () => {
       </div>
 
       {/* --- MODALS --- */}
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        settings={settings}
-        onUpdateSettings={setSettings}
-      />
-
-      <GalleryModal
-        isOpen={isGalleryOpen}
-        onClose={() => setIsGalleryOpen(false)}
-        photos={photos}
-        setPhotos={setPhotos}
-        selectedPhoto={selectedPhoto}
-        onSelectPhoto={setSelectedPhoto}
-      />
+      <Suspense fallback={null}>
+        {isSettingsOpen && (
+          <SettingsModal 
+            isOpen={isSettingsOpen} 
+            onClose={() => setIsSettingsOpen(false)} 
+            settings={settings}
+            onUpdateSettings={setSettings}
+          />
+        )}
+        {isGalleryOpen && (
+          <GalleryModal
+            isOpen={isGalleryOpen}
+            onClose={() => setIsGalleryOpen(false)}
+            photos={photos}
+            setPhotos={setPhotos}
+            selectedPhoto={selectedPhoto}
+            onSelectPhoto={setSelectedPhoto}
+          />
+        )}
+      </Suspense>
 
     </div>
   );
