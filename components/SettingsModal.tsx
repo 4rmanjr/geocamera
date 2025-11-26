@@ -82,15 +82,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleWebSync = async () => {
+    // Security Check
+    const code = prompt("Masukkan Kode Akses Area:");
+    if (!code || code.toLowerCase() !== 'kotabaru') {
+        alert("⛔ Akses Ditolak: Kode area salah.");
+        return;
+    }
+
     if (!webUrl) return;
     setIsSyncing(true);
     try {
         const result = await syncSettingsFromWeb(webUrl);
         if (result.success && result.settings) {
             onUpdateSettings(result.settings);
-            alert(result.message);
+            alert("✅ " + result.message + "\nSelamat datang, Tim Kotabaru!");
         } else {
-            alert(result.message);
+            alert("❌ " + result.message);
         }
     } catch (e) {
         alert("Terjadi kesalahan tidak terduga.");
@@ -494,22 +501,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               
               <div className="pt-2 border-t border-neutral-800 mt-2">
                   <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Sinkronisasi Web</h4>
-                  <div className="flex gap-2">
-                      <input 
-                        type="url" 
-                        value={webUrl}
-                        onChange={(e) => setWebUrl(e.target.value)}
-                        placeholder="https://website.com/settings.json"
-                        className="flex-1 bg-neutral-800 text-white text-xs px-3 py-2 rounded border border-neutral-700 focus:border-emerald-500 outline-none"
-                      />
+                  <div className="flex flex-col gap-2">
+                      {/* URL Input hidden for security/simplicity - Hardcoded to armanjr.my.id */}
                       <button 
                         onClick={handleWebSync}
                         disabled={isSyncing}
-                        className="bg-neutral-700 hover:bg-neutral-600 text-white px-3 py-2 rounded border border-neutral-600 flex items-center gap-2 disabled:opacity-50"
+                        className="w-full bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-800/50 px-4 py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
                       >
                         <RefreshIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                        {isSyncing ? '...' : 'Sync'}
+                        <span className="text-sm font-medium">{isSyncing ? 'Mengunduh Pengaturan...' : 'Sync from Server (Cloud)'}</span>
                       </button>
+                      <p className="text-[10px] text-gray-600 text-center">
+                        Mengunduh konfigurasi standar perusahaan dari server pusat.
+                      </p>
                   </div>
               </div>
            </div>
