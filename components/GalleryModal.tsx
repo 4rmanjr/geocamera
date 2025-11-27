@@ -270,7 +270,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
                 onClick={() => onSelectPhoto(photo)}
               >
                 <img 
-                  src={photo.webviewPath} 
+                  src={photo.thumbnailWebviewPath || photo.webviewPath} 
                   alt="Thumbnail" 
                   loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"

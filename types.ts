@@ -60,5 +60,7 @@ export interface CapturedImage {
 export interface SavedPhoto {
   filepath: string;
   webviewPath: string;
+  thumbnailPath?: string;         // Path native untuk thumbnail
+  thumbnailWebviewPath?: string;  // Path webview untuk thumbnail (untuk ditampilkan di img tag)
   timestamp: number;
 }

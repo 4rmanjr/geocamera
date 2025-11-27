@@ -1,4 +1,3 @@
-
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
 import { Share } from '@capacitor/share';
@@ -11,6 +10,15 @@ const ALBUM_NAME = 'GeoCam Pro';
 
 // --- Module-level cache for the album identifier ---
 let cachedAlbumIdentifier: string | null = null;
+
+// Helper to determine if we are in a native environment
+const isNative = Capacitor.isNativePlatform();
+
+// Helper to sanitize filenames (prevent path traversal)
+// Defined as function to ensure hoisting visibility
+function sanitizeFilename(path: string): string {
+    return path.replace(/^.*[\\\/]/, '');
+}
 
 // Helper to find or create the album and return its identifier
 const getAlbumIdentifier = async (): Promise<string> => {
@@ -46,40 +54,88 @@ const getAlbumIdentifier = async (): Promise<string> => {
     }
 };
 
+// Helper to generate thumbnail using Canvas
+const generateThumbnail = async (base64Data: string, maxWidth: number = 300): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
 
-// Helper to determine if we are in a native environment
-const isNative = Capacitor.isNativePlatform();
-
-// Helper to sanitize filenames (prevent path traversal)
-const sanitizeFilename = (path: string): string => {
-    return path.replace(/^.*[\\\/]/, '');
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error("Canvas context failed"));
+                return;
+            }
+            
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress thumbnail to 60% quality JPEG
+            const thumbBase64 = canvas.toDataURL('image/jpeg', 0.6); 
+            resolve(thumbBase64);
+        };
+        img.onerror = reject;
+        img.src = base64Data.startsWith('data:') ? base64Data : `data:image/jpeg;base64,${base64Data}`;
+    });
 };
 
 export const savePhoto = async (base64Data: string): Promise<SavedPhoto> => {
-  const fileName = `GeoCam_${Date.now()}.jpg`;
-  const base64DataClean = base64Data.split(',')[1]; // Remove "data:image/jpeg;base64,"
+  const timestamp = Date.now();
+  const fileName = `GeoCam_${timestamp}.jpg`;
+  const thumbName = `GeoCam_Thumb_${timestamp}.jpg`;
+  
+  // Ensure proper Base64 format
+  const base64DataClean = base64Data.startsWith('data:') ? base64Data.split(',')[1] : base64Data;
+  const base64Full = base64Data.startsWith('data:') ? base64Data : `data:image/jpeg;base64,${base64Data}`;
 
   if (isNative) {
+    // 1. Generate Thumbnail (Memory operation)
+    const thumbBase64Full = await generateThumbnail(base64Full);
+    const thumbBase64Clean = thumbBase64Full.split(',')[1];
+
+    // 2. Write Original File
     const savedFile = await Filesystem.writeFile({
       path: fileName,
       data: base64DataClean,
       directory: Directory.Data,
     });
 
+    // 3. Write Thumbnail File
+    const savedThumb = await Filesystem.writeFile({
+        path: thumbName,
+        data: thumbBase64Clean,
+        directory: Directory.Data,
+    });
+
     const newPhoto: SavedPhoto = {
       filepath: fileName,
       webviewPath: Capacitor.convertFileSrc(savedFile.uri),
-      timestamp: Date.now(),
+      thumbnailPath: thumbName,
+      thumbnailWebviewPath: Capacitor.convertFileSrc(savedThumb.uri),
+      timestamp: timestamp,
     };
 
     await addToPreferences(newPhoto);
     return newPhoto;
   } else {
     // Browser Fallback
+    // Generate thumb for browser testing too, though stored as string
+    const thumbBase64 = await generateThumbnail(base64Full);
+    
     const newPhoto: SavedPhoto = {
       filepath: fileName,
-      webviewPath: base64Data,
-      timestamp: Date.now(),
+      webviewPath: base64Full,
+      thumbnailPath: thumbName,
+      thumbnailWebviewPath: thumbBase64,
+      timestamp: timestamp,
     };
     
     try {
@@ -150,14 +206,32 @@ export const loadPhotos = async (): Promise<SavedPhoto[]> => {
   if (isNative) {
     const validPhotos = await Promise.all(photos.map(async (photo) => {
         try {
+            // Verify main file
             const safePath = sanitizeFilename(photo.filepath);
             const uri = await Filesystem.getUri({
                 path: safePath,
                 directory: Directory.Data
             });
+            
+            // Verify thumb file (if exists)
+            let thumbUri = uri.uri;
+            if (photo.thumbnailPath) {
+                try {
+                    const tUri = await Filesystem.getUri({
+                        path: sanitizeFilename(photo.thumbnailPath),
+                        directory: Directory.Data
+                    });
+                    thumbUri = tUri.uri;
+                } catch (e) {
+                    // If thumb missing, fallback to main image
+                    console.warn(`Thumbnail missing: ${photo.thumbnailPath}`);
+                }
+            }
+
             return {
                 ...photo,
-                webviewPath: Capacitor.convertFileSrc(uri.uri)
+                webviewPath: Capacitor.convertFileSrc(uri.uri),
+                thumbnailWebviewPath: Capacitor.convertFileSrc(thumbUri)
             };
         } catch (e) {
             console.warn(`File missing from storage: ${photo.filepath}`);
@@ -183,11 +257,18 @@ export const loadPhotos = async (): Promise<SavedPhoto[]> => {
 export const deletePhoto = async (photo: SavedPhoto) => {
   if (isNative) {
     try {
-        const safePath = sanitizeFilename(photo.filepath);
+        // Delete Original
         await Filesystem.deleteFile({
-            path: safePath,
+            path: sanitizeFilename(photo.filepath),
             directory: Directory.Data,
         });
+        // Delete Thumbnail if exists
+        if (photo.thumbnailPath) {
+            await Filesystem.deleteFile({
+                path: sanitizeFilename(photo.thumbnailPath),
+                directory: Directory.Data,
+            });
+        }
     } catch (e) {
         console.warn("Error deleting file from system:", e);
     }
@@ -212,11 +293,16 @@ export const deleteAllPhotos = async () => {
     if (isNative) {
         for (const photo of photos) {
             try {
-                const safePath = sanitizeFilename(photo.filepath);
                 await Filesystem.deleteFile({
-                    path: safePath,
+                    path: sanitizeFilename(photo.filepath),
                     directory: Directory.Data
                 });
+                if (photo.thumbnailPath) {
+                    await Filesystem.deleteFile({
+                        path: sanitizeFilename(photo.thumbnailPath),
+                        directory: Directory.Data
+                    }); 
+                }
             } catch (e) {
                 console.warn('Error deleting file', e);
             }

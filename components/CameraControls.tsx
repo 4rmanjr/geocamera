@@ -27,7 +27,11 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
         className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center text-white hover:bg-neutral-800 transition-all duration-300 relative overflow-hidden group active:scale-95"
       >
         {latestPhoto ? (
-            <img src={latestPhoto.webviewPath} alt="Latest" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+            <img 
+                src={latestPhoto.thumbnailWebviewPath || latestPhoto.webviewPath} 
+                alt="Latest" 
+                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+            />
         ) : (
             <GalleryIcon className="w-5 h-5 text-gray-500" />
         )}
