@@ -60,7 +60,7 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
   );
 
   const Company = () => (
-    <div className="mb-2 max-w-[50%]">
+    <div className="mb-2 max-w-[90%]">
       <div className="flex items-center gap-1 mb-0.5">
         <div className="h-2 w-0.5 bg-emerald-500"></div>
         <span className="text-[8px] text-emerald-400 font-bold tracking-wider uppercase shadow-black drop-shadow-md">Perusahaan</span>
@@ -72,7 +72,7 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
   );
 
   const Project = () => (
-    <div className="mb-2 max-w-[50%] flex flex-col items-end">
+    <div className="mb-2 max-w-[90%] flex flex-col items-end">
       <div className="flex items-center gap-1 mb-0.5">
         <span className="text-[8px] text-blue-300 font-bold tracking-wider uppercase shadow-black drop-shadow-md">Proyek</span>
         <div className="h-2 w-0.5 bg-blue-500"></div>
