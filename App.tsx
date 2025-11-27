@@ -173,7 +173,9 @@ const App = () => {
           style={getAspectRatioStyle()}
         >
             {/* Camera Source */}
-            {!isNative && (
+            {isNative ? (
+                <div id="cameraPreview" className="absolute inset-0 w-full h-full" />
+            ) : (
                 <video
                   ref={videoRef}
                   autoPlay
