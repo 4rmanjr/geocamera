@@ -90,13 +90,45 @@ lint/tmp/
 # Android Profiling
 *.hprof
 
-# Cordova plugins for Capacitor
-capacitor-cordova-android-plugins
+# Cordova plugins for Capacitor - DO NOT ignore this directory as it contains plugin code
+!capacitor-cordova-android-plugins/
 
-# Copied web assets
-app/src/main/assets/public
+# Ignore the generated web assets directory that gets copied from the web build
+app/src/main/assets/public/
 
-# Generated Config files
+# Ignore generated Capacitor config that gets created during sync
 app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
+
+# Gradle wrapper - keep essential files
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Android Studio files
+*.swp
+*~
+.project
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Gradle
+.gradle/
+
+# Android build outputs (these are generated and should not be committed)
+*/build/
+!*/build/outputs/
+
+# Local configuration file (sdk path, etc) - this should be ignored as it's machine-specific
+local.properties
+
+# Google Services
+google-services.json
+
+# Capacitor generated files
+capacitor.config.json

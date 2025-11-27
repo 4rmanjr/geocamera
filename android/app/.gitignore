@@ -1,2 +1,10 @@
-/build/*
+# Built application files
+/build/
+!/build/outputs/
+
+# Keep the .npmkeep file but ignore other build artifacts
 !/build/.npmkeep
+
+# Ignore specific build artifacts but keep outputs
+!build/outputs/apk/
+!build/outputs/bundle/
