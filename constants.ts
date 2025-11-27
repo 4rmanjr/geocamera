@@ -12,6 +12,13 @@ export const WATERMARK_SCALES = {
   l: 0.20
 };
 
+// Text Scale Factors for 'small' | 'medium' | 'large'
+export const OVERLAY_SCALE_FACTORS = {
+  small: 0.8,
+  medium: 1.0,
+  large: 1.3
+};
+
 export const DEFAULT_SETTINGS: AppSettings = {
   companyName: "PT. KONSTRUKSI MAJU",
   projectName: "Proyek Infrastruktur A",
@@ -32,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Default Sizes
   logoSize: 'm',
   qrSize: 'm',
+  overlaySize: 'medium',
 
   // Default Order (Top to Bottom visually within a group)
   itemOrder: ['logo', 'qr', 'company', 'project', 'time', 'coordinates'],

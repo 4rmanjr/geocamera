@@ -3,7 +3,7 @@ import { AppSettings, GeoLocationState } from '../types';
 import QRCode from 'qrcode';
 import { WORKER_CODE } from './workerSource';
 import { formatGpsAccuracy, formatCurrentDate } from './formatting';
-import { WATERMARK_SCALES } from '../constants';
+import { WATERMARK_SCALES, OVERLAY_SCALE_FACTORS } from '../constants';
 
 // Initialize Worker lazily
 let worker: Worker | null = null;
@@ -118,7 +118,8 @@ export const drawWatermark = async (
         posCoordinates: settings.posCoordinates,
         geoString,
         itemOrder: settings.itemOrder,
-        scaleConfig: WATERMARK_SCALES // Pass scale config
+        scaleConfig: WATERMARK_SCALES, // Pass scale config
+        overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium'] // Pass font scale factor
     };
 
     const transferables: Transferable[] = [sourceBitmap];

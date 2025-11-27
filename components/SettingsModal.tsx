@@ -303,6 +303,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-emerald-500 uppercase tracking-wider">Tampilan & Posisi</h3>
             
+            {/* Global Overlay Font Size */}
+            <div className="space-y-2">
+                <label className="block text-xs text-gray-400 uppercase tracking-wide font-bold">Ukuran Teks Overlay</label>
+                <div className="flex gap-2 bg-neutral-800 p-1 rounded-lg border border-neutral-700">
+                  <button
+                    onClick={() => handleChange('overlaySize', 'small')}
+                    className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
+                      settings.overlaySize === 'small' ? 'bg-neutral-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Small
+                  </button>
+                  <button
+                    onClick={() => handleChange('overlaySize', 'medium')}
+                    className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
+                      settings.overlaySize === 'medium' || !settings.overlaySize ? 'bg-neutral-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Medium
+                  </button>
+                  <button
+                    onClick={() => handleChange('overlaySize', 'large')}
+                    className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
+                      settings.overlaySize === 'large' ? 'bg-neutral-700 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Large
+                  </button>
+                </div>
+            </div>
+
             <div className="space-y-3">
               {settings.logoData && (
                  <ConfigRow 

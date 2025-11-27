@@ -13,6 +13,8 @@ export type WatermarkItemType = 'logo' | 'qr' | 'company' | 'project' | 'time' |
 
 export type WatermarkSize = 's' | 'm' | 'l';
 
+export type OverlaySize = 'small' | 'medium' | 'large';
+
 export interface AppSettings {
   companyName: string;
   projectName: string;
@@ -33,6 +35,7 @@ export interface AppSettings {
   // Size Settings
   logoSize: WatermarkSize;
   qrSize: WatermarkSize;
+  overlaySize: OverlaySize; // Text font size setting
 
   // Order Setting
   itemOrder: WatermarkItemType[];

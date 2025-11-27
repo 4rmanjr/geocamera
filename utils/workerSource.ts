@@ -104,7 +104,7 @@ export const WORKER_CODE = `
       const width = finalWidth;
       const height = finalHeight;
       const padding = width * 0.04;
-      const baseFontSize = width * 0.035;
+      const baseFontSize = width * 0.035 * (config.overlayScaleFactor || 1.0);
       const smallFontSize = baseFontSize * 0.75;
       
       const cursors = {

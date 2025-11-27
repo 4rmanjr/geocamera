@@ -46,6 +46,32 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
       }
   };
 
+  // Dynamic Font Size Helper
+  const getFontSize = (type: 'main' | 'label' | 'sub' | 'mini') => {
+      const size = settings.overlaySize || 'medium';
+      switch (size) {
+          case 'small':
+              if (type === 'main') return 'text-[12px] sm:text-sm'; // 10px -> 12px, xs (12px) -> sm (14px)
+              if (type === 'label') return 'text-[9px]'; // 7px -> 9px
+              if (type === 'sub') return 'text-[11px] sm:text-[12px]'; // 9px -> 11px, 10px -> 12px (xs)
+              if (type === 'mini') return 'text-[10px]'; // 8px -> 10px
+              return 'text-[12px]';
+          case 'large':
+              if (type === 'main') return 'text-base sm:text-lg'; // sm (14px) -> base (16px), base (16px) -> lg (18px)
+              if (type === 'label') return 'text-[11px] sm:text-[12px]'; // 9px -> 11px, 10px -> 12px (xs)
+              if (type === 'sub') return 'text-sm sm:text-base'; // xs (12px) -> sm (14px), sm (14px) -> base (16px)
+              if (type === 'mini') return 'text-[12px]'; // 10px -> 12px (xs)
+              return 'text-base';
+          case 'medium':
+          default:
+              if (type === 'main') return 'text-sm sm:text-base'; // xs (12px) -> sm (14px), sm (14px) -> base (16px)
+              if (type === 'label') return 'text-[10px]'; // 8px -> 10px
+              if (type === 'sub') return 'text-[12px] sm:text-sm'; // 10px -> 12px (xs), xs (12px) -> sm (14px)
+              if (type === 'mini') return 'text-[11px]'; // 9px -> 11px
+              return 'text-sm';
+      }
+  };
+
   // --- Sub-components ---
   const Logo = () => (
     <div className={`${getSizeClass(settings.logoSize)} bg-black/40 rounded-md backdrop-blur-md p-1 border border-white/20 shadow-sm mb-2 flex-shrink-0`}>
@@ -63,9 +89,9 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
     <div className="mb-2 max-w-[90%]">
       <div className="flex items-center gap-1 mb-0.5">
         <div className="h-2 w-0.5 bg-emerald-500"></div>
-        <span className="text-[8px] text-emerald-400 font-bold tracking-wider uppercase shadow-black drop-shadow-md">Perusahaan</span>
+        <span className={`${getFontSize('label')} text-emerald-400 font-bold tracking-wider uppercase shadow-black drop-shadow-md`}>Perusahaan</span>
       </div>
-      <h1 className="text-white font-bold text-xs sm:text-sm leading-none shadow-black drop-shadow-lg break-words">
+      <h1 className={`text-white font-bold ${getFontSize('main')} leading-none shadow-black drop-shadow-lg break-words`}>
         {settings.companyName.toUpperCase()}
       </h1>
     </div>
@@ -74,17 +100,17 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
   const Project = () => (
     <div className="mb-2 max-w-[90%] flex flex-col items-end">
       <div className="flex items-center gap-1 mb-0.5">
-        <span className="text-[8px] text-blue-300 font-bold tracking-wider uppercase shadow-black drop-shadow-md">Proyek</span>
+        <span className={`${getFontSize('label')} text-blue-300 font-bold tracking-wider uppercase shadow-black drop-shadow-md`}>Proyek</span>
         <div className="h-2 w-0.5 bg-blue-500"></div>
       </div>
-      <h2 className="text-white font-bold text-xs sm:text-sm leading-none shadow-black drop-shadow-lg text-right break-words">
+      <h2 className={`text-white font-bold ${getFontSize('main')} leading-none shadow-black drop-shadow-lg text-right break-words`}>
         {settings.projectName}
       </h2>
     </div>
   );
 
   const Time = () => (
-    <div className="text-white font-mono font-bold text-[10px] sm:text-xs shadow-black drop-shadow-md bg-black/40 border border-white/10 backdrop-blur-sm px-2 py-0.5 rounded mb-1 inline-block">
+    <div className={`text-white font-mono font-bold ${getFontSize('sub')} shadow-black drop-shadow-md bg-black/40 border border-white/10 backdrop-blur-sm px-2 py-0.5 rounded mb-1 inline-block`}>
       {currentTime}
     </div>
   );
@@ -98,7 +124,7 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
     const accStr = formatGpsAccuracy(geoState.accuracy);
 
     return (
-      <div className="flex flex-col items-start gap-0.5 text-white font-mono text-[10px] sm:text-xs mb-1 w-fit shadow-black drop-shadow-lg bg-black/40 border border-white/10 backdrop-blur-sm px-2 py-1 rounded">
+      <div className={`flex flex-col items-start gap-0.5 text-white font-mono ${getFontSize('sub')} mb-1 w-fit shadow-black drop-shadow-lg bg-black/40 border border-white/10 backdrop-blur-sm px-2 py-1 rounded`}>
         {geoState.loading ? (
           <div className="flex items-center gap-2">
              <MapPinIcon className="w-3 h-3 animate-pulse text-yellow-500" />
@@ -127,7 +153,7 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({ settings, geoState }) =>
                </div>
                {/* Simplified Accuracy Display */}
                <div className="flex justify-end mt-0.5 pt-0.5 border-t border-white/10">
-                  <span className={`text-[9px] font-bold ${accColor}`}>
+                  <span className={`${getFontSize('mini')} font-bold ${accColor}`}>
                     ±{accStr}m
                   </span>
                </div>
