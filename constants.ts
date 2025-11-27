@@ -3,8 +3,8 @@ import { AppSettings } from './types';
 
 // --- API & ENVIRONMENT CONFIGURATION ---
 // Read from .env file (Best Practice)
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://armanjr.my.id/geocamerapro';
-export const DEFAULT_ACCESS_CODE = (import.meta.env.VITE_DEFAULT_ACCESS_CODE || 'kotabaru').toLowerCase();
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+export const DEFAULT_ACCESS_CODE = (import.meta.env.VITE_DEFAULT_ACCESS_CODE || '').toLowerCase(); // Fallback empty string, forcing .env definition
 
 // Derived URLs
 export const API_URLS = {

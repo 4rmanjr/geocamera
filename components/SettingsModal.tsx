@@ -221,7 +221,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
       } catch (err) {
         console.error("Error processing logo", err);
-        alert("Gagal memproses gambar. Coba gambar yang lebih kecil.");
+        showToast("Gagal memproses gambar. Coba gambar yang lebih kecil.", "error");
       } finally {
         // Cleanup memory
         URL.revokeObjectURL(objectUrl);
@@ -234,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     img.onerror = () => {
         console.error("Failed to load image from object URL");
         URL.revokeObjectURL(objectUrl);
-        alert("File gambar rusak atau tidak didukung.");
+        showToast("File gambar rusak atau tidak didukung.", "error");
     };
 
     img.src = objectUrl;
