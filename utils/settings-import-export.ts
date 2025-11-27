@@ -110,3 +110,30 @@ export const syncSettingsFromWeb = async (url: string): Promise<{ success: boole
     return { success: false, message: `Gagal sinkronisasi: ${error.message}` };
   }
 };
+
+// Function to UPLOAD settings to web server (Admin Only)
+export const uploadSettingsToWeb = async (targetUrl: string, secretKey: string, settings: AppSettings): Promise<{ success: boolean; message: string }> => {
+    try {
+        const response = await fetch(targetUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                secret: secretKey,
+                settings: settings
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            return { success: true, message: result.message || "Upload berhasil!" };
+        } else {
+            return { success: false, message: result.message || "Gagal upload ke server." };
+        }
+    } catch (error: any) {
+        console.error("Upload error:", error);
+        return { success: false, message: `Network Error: ${error.message}` };
+    }
+};

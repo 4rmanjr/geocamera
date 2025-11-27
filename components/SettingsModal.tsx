@@ -1,8 +1,8 @@
 
 import React, { useRef, useState } from 'react';
 import { AppSettings, WatermarkPosition, WatermarkItemType, WatermarkSize } from '../types';
-import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ShareIcon, DownloadIcon, RefreshIcon } from '../icons';
-import { shareSettings, validateAndParseSettings, syncSettingsFromWeb } from '../utils/settings-import-export';
+import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ShareIcon, DownloadIcon, RefreshIcon, CloudUploadIcon } from '../icons';
+import { shareSettings, validateAndParseSettings, syncSettingsFromWeb, uploadSettingsToWeb } from '../utils/settings-import-export';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,8 +44,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Web Sync State
-  const [webUrl, setWebUrl] = useState('https://armanjr.my.id/geocam-settings.json');
+  const [webUrl, setWebUrl] = useState('https://armanjr.my.id/geocamerapro/geocam-settings.json');
+  const [uploadUrl, setUploadUrl] = useState('https://armanjr.my.id/geocamerapro/update_settings.php');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -104,6 +106,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
         setIsSyncing(false);
     }
+  };
+
+  const handleAdminUpload = async () => {
+      const secret = prompt("🔑 ADMIN ONLY: Masukkan Secret Key untuk mengupdate server:");
+      if (!secret) return;
+
+      setIsUploading(true);
+      try {
+          const result = await uploadSettingsToWeb(uploadUrl, secret, settings);
+          if (result.success) {
+              alert("✅ SUKSES: " + result.message);
+          } else {
+              alert("❌ GAGAL: " + result.message);
+          }
+      } catch (e) {
+          alert("Error jaringan.");
+      } finally {
+          setIsUploading(false);
+      }
   };
 
   const getItemPosition = (type: WatermarkItemType): WatermarkPosition => {
@@ -545,6 +566,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <p className="text-[10px] text-gray-600 text-center">
                         Mengunduh konfigurasi standar perusahaan dari server pusat.
                       </p>
+                  </div>
+
+                  {/* Admin Upload Button */}
+                  <div className="mt-4 pt-2 border-t border-neutral-800/50">
+                      <button 
+                        onClick={handleAdminUpload}
+                        disabled={isUploading}
+                        className="w-full bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white border border-neutral-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition text-xs"
+                      >
+                        <CloudUploadIcon className={`w-4 h-4 ${isUploading ? 'animate-bounce' : ''}`} />
+                        <span>{isUploading ? 'Mengupload...' : 'Admin: Upload Setting ke Server'}</span>
+                      </button>
                   </div>
               </div>
            </div>
