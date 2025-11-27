@@ -49,12 +49,19 @@ npm install
 ```
 
 ### 2. Environment Setup (Frontend)
-Create a `.env` file in the root directory based on your needs:
+Create a `.env` file in the root directory by copying `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Then, edit the `.env` file with your specific values:
 
 ```env
 VITE_API_BASE_URL=https://your-domain.com/geocamerapro
-VITE_DEFAULT_ACCESS_CODE=yourcode
+VITE_DEFAULT_ACCESS_CODE=yourcode # e.g., kotabaru
 ```
+*(Note: `VITE_API_BASE_URL` should point to the folder where you upload your PHP scripts and `geocam-settings.json`.)*
 
 ### 3. Local Development
 ```bash
@@ -81,10 +88,10 @@ To enable the **Admin Upload** feature, you must host the PHP backend script on 
 
 1.  **Files:** Copy `update_settings.php` and `config.php.example` from the project root to your server (e.g., `public_html/geocamerapro/`).
 2.  **Config:** 
-    *   Rename `config.php.example` to `config.php`.
-    *   Edit `config.php` and set a strong `ADMIN_SECRET_KEY`.
+    *   On your server, **rename `config.php.example` to `config.php`**.
+    *   Edit the `config.php` file and set a strong `ADMIN_SECRET_KEY` inside it.
     *   **Important:** Set file permission of `config.php` to `644` or `600` for security.
-3.  **Permissions:** Ensure the directory is writable (755) so the script can create `geocam-settings.json`.
+3.  **Permissions:** Ensure the directory (`public_html/geocamerapro/`) is writable (755) so the script can create/update `geocam-settings.json`.
 
 ### Workflow:
 1.  **Admin:** Configures app -> Clicks **"Admin: Upload Setting"** -> Enters Secret Key.
