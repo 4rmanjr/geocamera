@@ -16,6 +16,13 @@ const getWorker = () => {
   return worker;
 };
 
+export const terminateWorker = () => {
+    if (worker) {
+        worker.terminate();
+        worker = null;
+    }
+};
+
 // Helper to load image to Bitmap
 const loadBitmap = async (src: string): Promise<ImageBitmap | null> => {
     try {
@@ -32,6 +39,116 @@ const loadBitmap = async (src: string): Promise<ImageBitmap | null> => {
     }
 };
 
+// --- Internal Helpers for drawWatermark ---
+
+const prepareSourceBitmap = async (source: HTMLVideoElement | string): Promise<ImageBitmap> => {
+    if (typeof source === 'string') {
+        const bmp = await loadBitmap(`data:image/jpeg;base64,${source}`);
+        if (!bmp) throw new Error("Failed to load captured image");
+        return bmp;
+    } else {
+        return await createImageBitmap(source);
+    }
+};
+
+const prepareGeoString = (geoState: GeoLocationState): string => {
+    if (geoState.lat !== null && geoState.lng !== null) {
+        const accStr = formatGpsAccuracy(geoState.accuracy);
+        const accDisplay = accStr ? ` (±${accStr}m)` : '';
+        return `Lat: ${geoState.lat.toFixed(6)} | Long: ${geoState.lng.toFixed(6)}${accDisplay}`;
+    }
+    return "";
+};
+
+const prepareLogoBitmap = async (settings: AppSettings): Promise<ImageBitmap | null> => {
+    if (settings.showLogo && settings.logoData) {
+        return await loadBitmap(settings.logoData);
+    }
+    return null;
+};
+
+const prepareQrBitmap = async (settings: AppSettings, geoState: GeoLocationState): Promise<ImageBitmap | null> => {
+    if (settings.showQrCode && geoState.lat !== null && geoState.lng !== null && !geoState.error) {
+        const lat = geoState.lat.toFixed(6);
+        const lng = geoState.lng.toFixed(6);
+        const qrData = `https://maps.google.com/?q=${lat},${lng}`;
+        try {
+            const qrUrl = await QRCode.toDataURL(qrData, { margin: 2, width: 256, color: { dark: '#000000', light: '#ffffff' } });
+            return await loadBitmap(qrUrl);
+        } catch (e) {
+            console.warn("QR Gen failed", e);
+        }
+    }
+    return null;
+};
+
+const executeWorker = (
+    sourceBitmap: ImageBitmap,
+    logoBitmap: ImageBitmap | null,
+    qrBitmap: ImageBitmap | null,
+    settings: AppSettings,
+    geoString: string,
+    timeString: string,
+    geoState: GeoLocationState,
+    isFrontCamera: boolean
+): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const w = getWorker();
+        
+        const handler = (e: MessageEvent<WorkerResponse>) => {
+            w.removeEventListener('message', handler);
+            if (e.data.success) {
+                resolve(e.data.data!);
+            } else {
+                reject(new Error(e.data.error));
+            }
+        };
+        
+        w.addEventListener('message', handler);
+
+        const config: WorkerConfig = {
+            isFrontCamera,
+            resolution: settings.resolution,
+            aspectRatio: settings.aspectRatio,
+            showLogo: settings.showLogo,
+            posLogo: settings.posLogo,
+            logoSize: settings.logoSize,
+            showQrCode: settings.showQrCode,
+            posQr: settings.posQr,
+            qrSize: settings.qrSize,
+            companyName: settings.companyName,
+            showCompany: settings.showCompany,
+            posCompany: settings.posCompany,
+            projectName: settings.projectName,
+            showProject: settings.showProject,
+            posProject: settings.posProject,
+            showTime: settings.showTime,
+            posTime: settings.posTime,
+            timeString,
+            showCoordinates: settings.showCoordinates && (geoState.lat !== null),
+            posCoordinates: settings.posCoordinates,
+            geoString,
+            itemOrder: settings.itemOrder,
+            scaleConfig: WATERMARK_SCALES,
+            overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium']
+        };
+
+        const messagePayload: WorkerMessage = {
+            sourceBitmap,
+            logoBitmap,
+            qrBitmap,
+            config
+        };
+
+        const transferables: Transferable[] = [sourceBitmap];
+        if (logoBitmap) transferables.push(logoBitmap);
+        if (qrBitmap) transferables.push(qrBitmap);
+
+        w.postMessage(messagePayload, transferables);
+    });
+};
+
+// Main Function
 export const drawWatermark = async (
   source: HTMLVideoElement | string,
   settings: AppSettings,
@@ -39,100 +156,26 @@ export const drawWatermark = async (
   isFrontCamera: boolean = false
 ): Promise<string> => {
   
-  let sourceBitmap: ImageBitmap;
+  // 1. Prepare all resources in parallel where possible
+  const [sourceBitmap, logoBitmap, qrBitmap] = await Promise.all([
+      prepareSourceBitmap(source),
+      prepareLogoBitmap(settings),
+      prepareQrBitmap(settings, geoState)
+  ]);
 
-  // 1. Prepare Source Bitmap
-  if (typeof source === 'string') {
-      const bmp = await loadBitmap(`data:image/jpeg;base64,${source}`);
-      if (!bmp) throw new Error("Failed to load captured image");
-      sourceBitmap = bmp;
-  } else {
-      sourceBitmap = await createImageBitmap(source);
-  }
-
-  // 2. Prepare Data Strings (Using Centralized Formatter)
+  // 2. Prepare Strings
   const timeString = formatCurrentDate();
-  
-  let geoString = "";
-  if (geoState.lat !== null && geoState.lng !== null) {
-      const accStr = formatGpsAccuracy(geoState.accuracy);
-      const accDisplay = accStr ? ` (±${accStr}m)` : '';
-      geoString = `Lat: ${geoState.lat.toFixed(6)} | Long: ${geoState.lng.toFixed(6)}${accDisplay}`;
-  }
+  const geoString = prepareGeoString(geoState);
 
-  // 3. Prepare Bitmaps
-  let logoBitmap: ImageBitmap | null = null;
-  if (settings.showLogo && settings.logoData) {
-      logoBitmap = await loadBitmap(settings.logoData);
-  }
-
-  let qrBitmap: ImageBitmap | null = null;
-  if (settings.showQrCode && geoState.lat !== null && geoState.lng !== null && !geoState.error) {
-      const lat = geoState.lat.toFixed(6);
-      const lng = geoState.lng.toFixed(6);
-      const qrData = `https://maps.google.com/?q=${lat},${lng}`;
-      
-      try {
-          const qrUrl = await QRCode.toDataURL(qrData, { margin: 2, width: 256, color: { dark: '#000000', light: '#ffffff' } });
-          qrBitmap = await loadBitmap(qrUrl);
-      } catch (e) {
-          console.warn("QR Gen failed", e);
-      }
-  }
-
-  // 4. Offload to Worker
-  return new Promise((resolve, reject) => {
-    const w = getWorker();
-    
-    const handler = (e: MessageEvent<WorkerResponse>) => {
-        w.removeEventListener('message', handler);
-        if (e.data.success) {
-            resolve(e.data.data!);
-        } else {
-            reject(new Error(e.data.error));
-        }
-    };
-    
-    w.addEventListener('message', handler);
-
-    const config: WorkerConfig = {
-        isFrontCamera,
-        resolution: settings.resolution,
-        aspectRatio: settings.aspectRatio,
-        showLogo: settings.showLogo,
-        posLogo: settings.posLogo,
-        logoSize: settings.logoSize,
-        showQrCode: settings.showQrCode,
-        posQr: settings.posQr,
-        qrSize: settings.qrSize,
-        companyName: settings.companyName,
-        showCompany: settings.showCompany,
-        posCompany: settings.posCompany,
-        projectName: settings.projectName,
-        showProject: settings.showProject,
-        posProject: settings.posProject,
-        showTime: settings.showTime,
-        posTime: settings.posTime,
-        timeString,
-        showCoordinates: settings.showCoordinates && (geoState.lat !== null),
-        posCoordinates: settings.posCoordinates,
-        geoString,
-        itemOrder: settings.itemOrder,
-        scaleConfig: WATERMARK_SCALES,
-        overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium']
-    };
-
-    const messagePayload: WorkerMessage = {
-        sourceBitmap,
-        logoBitmap,
-        qrBitmap,
-        config
-    };
-
-    const transferables: Transferable[] = [sourceBitmap];
-    if (logoBitmap) transferables.push(logoBitmap);
-    if (qrBitmap) transferables.push(qrBitmap);
-
-    w.postMessage(messagePayload, transferables);
-  });
+  // 3. Execute Worker
+  return executeWorker(
+      sourceBitmap, 
+      logoBitmap, 
+      qrBitmap, 
+      settings, 
+      geoString, 
+      timeString, 
+      geoState, 
+      isFrontCamera
+  );
 };

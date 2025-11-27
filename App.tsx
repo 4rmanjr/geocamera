@@ -12,6 +12,7 @@ import { useCamera, requestCameraPermission } from './hooks/useCamera';
 import { useGeolocation, requestLocationPermission } from './hooks/useGeolocation';
 import { useGallery } from './hooks/useGallery';
 import { useCapture } from './hooks/useCapture';
+import { terminateWorker } from './utils/imageProcessing';
 
 const SETTINGS_KEY = 'geoCamSettings_v1';
 
@@ -76,6 +77,13 @@ const App = () => {
     };
 
     setupApp();
+  }, []);
+
+  // --- Worker Cleanup ---
+  useEffect(() => {
+    return () => {
+      terminateWorker();
+    };
   }, []);
 
   // --- Persistence ---
