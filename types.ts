@@ -3,6 +3,12 @@ export interface GeoLocationState {
   lat: number | null;
   lng: number | null;
   accuracy: number | null;
+  address?: {
+    village?: string;
+    district?: string;
+    city?: string;
+    state?: string;
+  };
   loading: boolean;
   error: string | null;
 }
@@ -89,6 +95,7 @@ export interface WorkerConfig {
   showCoordinates: boolean;
   posCoordinates: WatermarkPosition;
   geoString: string;
+  addressLines: string[];
   itemOrder: WatermarkItemType[];
   scaleConfig: Record<WatermarkSize, number>;
   overlayScaleFactor: number;

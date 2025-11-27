@@ -60,6 +60,27 @@ const prepareGeoString = (geoState: GeoLocationState): string => {
     return "";
 };
 
+const prepareAddressLines = (geoState: GeoLocationState): string[] => {
+    const { address } = geoState;
+    if (!address) return [];
+
+    const lines: string[] = [];
+
+    // Line 1: Village, District
+    const line1Parts = [];
+    if (address.village) line1Parts.push(address.village);
+    if (address.district) line1Parts.push(address.district);
+    if (line1Parts.length > 0) lines.push(line1Parts.join(', '));
+
+    // Line 2: City, State
+    const line2Parts = [];
+    if (address.city) line2Parts.push(address.city);
+    if (address.state) line2Parts.push(address.state);
+    if (line2Parts.length > 0) lines.push(line2Parts.join(', '));
+
+    return lines;
+};
+
 const prepareLogoBitmap = async (settings: AppSettings): Promise<ImageBitmap | null> => {
     if (settings.showLogo && settings.logoData) {
         return await loadBitmap(settings.logoData);
@@ -88,6 +109,7 @@ const executeWorker = (
     qrBitmap: ImageBitmap | null,
     settings: AppSettings,
     geoString: string,
+    addressLines: string[],
     timeString: string,
     geoState: GeoLocationState,
     isFrontCamera: boolean
@@ -128,6 +150,7 @@ const executeWorker = (
             showCoordinates: settings.showCoordinates && (geoState.lat !== null),
             posCoordinates: settings.posCoordinates,
             geoString,
+            addressLines,
             itemOrder: settings.itemOrder,
             scaleConfig: WATERMARK_SCALES,
             overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium']
@@ -166,6 +189,7 @@ export const drawWatermark = async (
   // 2. Prepare Strings
   const timeString = formatCurrentDate();
   const geoString = prepareGeoString(geoState);
+  const addressLines = prepareAddressLines(geoState);
 
   // 3. Execute Worker
   return executeWorker(
@@ -174,6 +198,7 @@ export const drawWatermark = async (
       qrBitmap, 
       settings, 
       geoString, 
+      addressLines,
       timeString, 
       geoState, 
       isFrontCamera

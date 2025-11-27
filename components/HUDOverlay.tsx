@@ -99,6 +99,10 @@ const Geo = React.memo(({ settings, geoState }: { settings: AppSettings, geoStat
   // Use Centralized Formatter
   const accStr = formatGpsAccuracy(geoState.accuracy);
 
+  // Address Data
+  const { address } = geoState;
+  const hasAddress = address && (address.village || address.district || address.city);
+
   return (
     <div className={`flex flex-col items-start gap-0.5 text-white font-mono ${getFontSize(settings.overlaySize, 'sub')} mb-1 w-fit shadow-black drop-shadow-lg bg-black/40 border border-white/10 backdrop-blur-sm px-2 py-1 rounded`}>
       {geoState.loading ? (
@@ -127,6 +131,27 @@ const Geo = React.memo(({ settings, geoState }: { settings: AppSettings, geoStat
                 <span className="text-gray-300">Long:</span>
                 <span className="font-bold">{geoState.lng?.toFixed(6)}</span>
              </div>
+
+             {/* Address Display */}
+             {hasAddress && (
+                 <div className={`flex flex-col mt-1 pt-1 border-t border-white/10 leading-tight text-gray-100 ${getFontSize(settings.overlaySize, 'mini')}`}>
+                    {(address.village || address.district) && (
+                        <div className="mb-0.5">
+                            {address.village && <span>{address.village}</span>}
+                            {address.village && address.district && <span>, </span>}
+                            {address.district && <span>{address.district}</span>}
+                        </div>
+                    )}
+                    {(address.city || address.state) && (
+                        <div>
+                            {address.city && <span>{address.city}</span>}
+                            {address.city && address.state && <span>, </span>}
+                            {address.state && <span className="text-gray-300">{address.state}</span>}
+                        </div>
+                    )}
+                 </div>
+             )}
+
              {/* Simplified Accuracy Display */}
              <div className="flex justify-end mt-0.5 pt-0.5 border-t border-white/10">
                 <span className={`${getFontSize(settings.overlaySize, 'mini')} font-bold ${accColor}`}>

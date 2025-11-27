@@ -186,7 +186,40 @@ export const WORKER_CODE = `
             if (config.showTime) drawTextLine(config.timeString, config.posTime, smallFontSize, true);
         },
         'coordinates': () => {
-            if (config.showCoordinates) drawTextLine(config.geoString, config.posCoordinates, smallFontSize, false, true);
+            if (config.showCoordinates) {
+                const isBottom = config.posCoordinates.startsWith('bottom');
+                const addressFontSize = smallFontSize * 0.9;
+
+                const drawGeo = () => drawTextLine(config.geoString, config.posCoordinates, smallFontSize, false, true);
+                
+                const drawAddress = () => {
+                     if (config.addressLines && config.addressLines.length > 0) {
+                        // For bottom, we draw the last line first (lowest), then move up.
+                        // Visual Goal:
+                        // Lat/Long
+                        // Address Line 1
+                        // Address Line 2
+                        
+                        // If Bottom:
+                        // Draw Address Line 2 (at bottom) -> cursor moves up
+                        // Draw Address Line 1 (above 2) -> cursor moves up
+                        // Draw Lat/Long (above 1) -> cursor moves up
+                        
+                        const linesToDraw = isBottom ? [...config.addressLines].reverse() : config.addressLines;
+                        linesToDraw.forEach(line => {
+                            drawTextLine(line, config.posCoordinates, addressFontSize, false, false);
+                        });
+                     }
+                };
+
+                if (isBottom) {
+                    drawAddress();
+                    drawGeo();
+                } else {
+                    drawGeo();
+                    drawAddress();
+                }
+            }
         }
       };
 

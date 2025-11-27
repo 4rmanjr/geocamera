@@ -39,6 +39,57 @@ export const useGeolocation = ({ isEnabled }: UseGeoLocationProps) => {
   const watchIdRef = useRef<string | null>(null);
   const lastUpdateRef = useRef<number>(0);
   const currentAccuracyRef = useRef<number>(9999);
+  const lastGeocodeRef = useRef<{lat: number, lng: number} | null>(null);
+
+  const fetchAddress = async (lat: number, lng: number) => {
+    try {
+        // Simple distance check to avoid spamming API (approx 50m)
+        if (lastGeocodeRef.current) {
+            const dist = Math.sqrt(
+                Math.pow(lat - lastGeocodeRef.current.lat, 2) + 
+                Math.pow(lng - lastGeocodeRef.current.lng, 2)
+            );
+            // 0.0005 degrees is roughly 50m at equator
+            if (dist < 0.0005) return; 
+        }
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+            headers: {
+                'User-Agent': 'GeoCamPro/1.0'
+            }
+        });
+        
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const addr = data.address;
+
+        // Robust mapping for Indonesian Administrative Levels
+        // 1. Village / Kelurahan
+        const village = addr.village || addr.suburb || addr.neighbourhood;
+        
+        // 2. District / Kecamatan
+        // OSM often puts Kecamatan in 'city_district', 'district', 'town', or sometimes 'municipality' (rarely)
+        const district = addr.city_district || addr.district || addr.town || addr.subdistrict;
+
+        // 3. City / Regency (Kabupaten/Kota)
+        const city = addr.city || addr.county || addr.regency || addr.municipality;
+
+        // 4. State / Province
+        const state = addr.state;
+
+        if (village || district || city) {
+            lastGeocodeRef.current = { lat, lng };
+            setGeoState(prev => ({
+                ...prev,
+                address: { village, district, city, state }
+            }));
+        }
+
+    } catch (e) {
+        console.warn("Geocoding failed:", e);
+    }
+  };
 
   const updatePosition = useCallback((pos: any) => {
       const now = Date.now();
@@ -63,13 +114,20 @@ export const useGeolocation = ({ isEnabled }: UseGeoLocationProps) => {
           lastUpdateRef.current = now;
           currentAccuracyRef.current = newAccuracy;
 
-          setGeoState({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+
+          setGeoState(prev => ({
+            lat: lat,
+            lng: lng,
             accuracy: Math.round(newAccuracy), // Round for cleaner UI
+            address: prev.address, // Keep existing address until updated
             loading: false,
             error: null
-          });
+          }));
+
+          // Trigger Geocoding (Non-blocking)
+          fetchAddress(lat, lng);
       }
   }, []);
 
