@@ -44,19 +44,22 @@ export const useGeolocation = ({ isEnabled }: UseGeoLocationProps) => {
       const now = Date.now();
       const newAccuracy = pos.coords.accuracy;
       const timeDiff = now - lastUpdateRef.current;
+      const currentAcc = currentAccuracyRef.current;
 
-      // LOGIC: SMART FILTERING
-      // 1. Always update if it's the first fix (or we have no data).
-      // 2. Always update if accuracy is better (smaller number is better).
-      // 3. Update if accuracy is 'Good Enough' (< 15m) to keep movement fluid.
-      // 4. Force update if data is stale (> 5 seconds) to avoid getting stuck on an old "perfect" point that is no longer valid.
+      // LOGIC: HIGH PRECISION LOCK (Optimized for GeoCamPro)
+      // 1. First fix: Always update to show SOMETHING immediately.
+      // 2. Better Accuracy: Always update (e.g., 20m -> 5m).
+      // 3. High Accuracy Maintenance: If new point is < 10m, update.
+      //    (This allows tracking small movements while we have good signal).
+      // 4. Anti-Drift: If we have a good lock (e.g., 5m) and suddenly get 50m, IGNORE it unless...
+      // 5. Staleness: ...it's been > 10s. Then we accept the degraded signal (user entered building).
       
       const isFirstFix = lastUpdateRef.current === 0;
-      const isBetterAccuracy = newAccuracy <= currentAccuracyRef.current;
-      const isGoodEnough = newAccuracy < 15; 
-      const isStale = timeDiff > 5000; 
+      const isBetterAccuracy = newAccuracy <= currentAcc;
+      const isHighAccuracy = newAccuracy <= 10; // Excellent GPS lock
+      const isStale = timeDiff > 10000; // Refresh if data is > 10s old
 
-      if (isFirstFix || isBetterAccuracy || isGoodEnough || isStale) {
+      if (isFirstFix || isBetterAccuracy || isHighAccuracy || isStale) {
           lastUpdateRef.current = now;
           currentAccuracyRef.current = newAccuracy;
 
@@ -81,7 +84,7 @@ export const useGeolocation = ({ isEnabled }: UseGeoLocationProps) => {
       { 
           enableHighAccuracy: true, // Force GPS/Hardware
           timeout: 10000,           // Wait max 10s per fix attempt
-          maximumAge: 0             // CRITICAL: Do not use cached positions. Force fresh data.
+          maximumAge: 5000          // Allow 5s old cache for instant start
       },
       (pos, err) => {
         if (err) {
