@@ -17,6 +17,9 @@ yarn-error.log*
 .env.*.local
 .env
 
+# PHP Config (Secrets)
+config.php
+
 # Capacitor specific (generated native project files)
 android/build/
 android/app/build/
@@ -37,3 +40,5 @@ metadata.json
 .DS_Store
 *~
 *.tmp
+
+.csv

@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { AppSettings, WatermarkPosition, WatermarkItemType, WatermarkSize } from '../types';
 import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ShareIcon, DownloadIcon, RefreshIcon, CloudUploadIcon } from '../icons';
 import { shareSettings, validateAndParseSettings, syncSettingsFromWeb, uploadSettingsToWeb } from '../utils/settings-import-export';
+import { API_URLS, DEFAULT_ACCESS_CODE } from '../constants';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -44,8 +45,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const importFileRef = useRef<HTMLInputElement>(null);
 
   // Web Sync State
-  const [webUrl, setWebUrl] = useState('https://armanjr.my.id/geocamerapro/geocam-settings.json');
-  const [uploadUrl, setUploadUrl] = useState('https://armanjr.my.id/geocamerapro/update_settings.php');
+  const [webUrl, setWebUrl] = useState(API_URLS.SETTINGS_JSON);
+  const [uploadUrl, setUploadUrl] = useState(API_URLS.UPDATE_ENDPOINT);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -86,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleWebSync = async () => {
     // Security Check
     const code = prompt("Masukkan Kode Akses Area:");
-    if (!code || code.toLowerCase() !== 'kotabaru') {
+    if (!code || code.toLowerCase() !== DEFAULT_ACCESS_CODE) {
         alert("⛔ Akses Ditolak: Kode area salah.");
         return;
     }

@@ -1,0 +1,7 @@
+<?php
+// config.php.example
+// Rename this file to 'config.php' and upload to your server.
+// Set strict file permissions (644 or 600).
+
+define('ADMIN_SECRET_KEY', 'ChangeThisToYourStrongPassword!');
+?>

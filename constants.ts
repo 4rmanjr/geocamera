@@ -1,6 +1,17 @@
 
 import { AppSettings } from './types';
 
+// --- API & ENVIRONMENT CONFIGURATION ---
+// Read from .env file (Best Practice)
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://armanjr.my.id/geocamerapro';
+export const DEFAULT_ACCESS_CODE = (import.meta.env.VITE_DEFAULT_ACCESS_CODE || 'kotabaru').toLowerCase();
+
+// Derived URLs
+export const API_URLS = {
+    SETTINGS_JSON: `${API_BASE_URL}/geocam-settings.json`,
+    UPDATE_ENDPOINT: `${API_BASE_URL}/update_settings.php`
+};
+
 // Centralized Scale Configuration (Percentage of Image Width)
 // Base Unit = 10%
 // S = 1.0x (10%)

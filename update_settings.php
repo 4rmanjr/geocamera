@@ -1,10 +1,9 @@
 <?php
 // update_settings.php
 
-// --- KONFIGURASI KEAMANAN ---
-// Ganti ini dengan password yang SANGAT KUAT dan unik.
-// Jangan gunakan password cPanel atau email.
-$ADMIN_SECRET = "Kunc1Rahas1aGeoCam2025!"; 
+// Load Configuration (Secret Key)
+// Pastikan file config.php ada dan memiliki permission 600 atau 644
+require_once 'config.php';
 
 // --- SETUP HEADER (CORS) ---
 // Penting agar aplikasi (Android/Web) bisa akses script ini
@@ -36,8 +35,8 @@ if (!isset($input['secret']) || !isset($input['settings'])) {
     exit();
 }
 
-// Cek Password/Secret
-if ($input['secret'] !== $ADMIN_SECRET) {
+// Cek Password/Secret (Using Constant from config.php)
+if ($input['secret'] !== ADMIN_SECRET_KEY) {
     http_response_code(403);
     echo json_encode(["success" => false, "message" => "Invalid Secret Key"]);
     exit();
