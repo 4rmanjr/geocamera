@@ -74,6 +74,12 @@ export const validateAndParseSettings = (jsonString: string): AppSettings => {
       merged.logoData = null;
   }
 
+  // Validate overlaySize enum
+  const validSizes = ['small', 'medium', 'large'];
+  if (!validSizes.includes(merged.overlaySize)) {
+      merged.overlaySize = 'medium';
+  }
+
   return merged as AppSettings;
 };
 
