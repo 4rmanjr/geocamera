@@ -202,6 +202,17 @@ const App = () => {
             {/* Effects */}
             <div className={`absolute inset-0 bg-black pointer-events-none z-30 transition-opacity duration-75 ${effectState === 'shutter' ? 'opacity-100' : 'opacity-0'}`} />
             <div className={`absolute inset-0 bg-white pointer-events-none z-30 transition-opacity duration-300 ${effectState === 'flash' ? 'opacity-80' : 'opacity-0'}`} />
+            
+            {/* Camera Error UI */}
+            {cameraError && (
+                <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-neutral-900/90 p-6 text-center">
+                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                        <SettingsIcon className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h3 className="text-white font-bold text-lg mb-2">Kamera Bermasalah</h3>
+                    <p className="text-gray-400 text-sm max-w-xs">{cameraError}</p>
+                </div>
+            )}
         </div>
       </div>
 
