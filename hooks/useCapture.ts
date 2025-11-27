@@ -3,6 +3,7 @@ import { AppSettings, GeoLocationState, SavedPhoto } from '../types';
 import { drawWatermark } from '../utils/imageProcessing';
 import { savePhoto } from '../utils/storage';
 import { playShutterSound } from '../utils/audio';
+import { useToast } from '../contexts/ToastContext';
 
 interface UseCaptureProps {
     videoRef: React.RefObject<HTMLVideoElement>;
@@ -25,7 +26,7 @@ export const useCapture = ({
 }: UseCaptureProps) => {
     const [isCapturing, setIsCapturing] = useState(false);
     const [effectState, setEffectState] = useState<'idle' | 'shutter' | 'flash'>('idle');
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const { showToast } = useToast();
 
     const handleCapture = async () => {
         if (isCapturing) return;
@@ -60,13 +61,11 @@ export const useCapture = ({
             const newPhoto = await savePhoto(watermarkResult);
             addPhotoToGallery(newPhoto);
             
-            setToastMessage("Foto tersimpan");
-            setTimeout(() => setToastMessage(null), 2500);
+            showToast("Foto tersimpan", "success");
 
         } catch (e: any) {
             console.error("Capture failed", e);
-            setToastMessage(`Gagal: ${e.message || "Error"}`);
-            setTimeout(() => setToastMessage(null), 3500);
+            showToast(`Gagal: ${e.message || "Error"}`, "error");
         } finally {
             setEffectState('idle');
             setIsCapturing(false);
@@ -76,8 +75,6 @@ export const useCapture = ({
     return {
         isCapturing,
         effectState,
-        toastMessage,
-        setToastMessage,
         handleCapture
     };
 };

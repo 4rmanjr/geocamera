@@ -4,6 +4,7 @@ import { AppSettings, WatermarkPosition, WatermarkItemType, WatermarkSize } from
 import { XIcon, CheckIcon, UploadIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, ShareIcon, DownloadIcon, RefreshIcon, CloudUploadIcon } from '../icons';
 import { shareSettings, validateAndParseSettings, syncSettingsFromWeb, uploadSettingsToWeb } from '../utils/settings-import-export';
 import { API_URLS, DEFAULT_ACCESS_CODE } from '../constants';
+import { useToast } from '../contexts/ToastContext';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   // Web Sync State
   const [webUrl, setWebUrl] = useState(API_URLS.SETTINGS_JSON);
@@ -60,7 +62,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     try {
       await shareSettings(settings);
     } catch (err: any) {
-      alert("Gagal membagikan file: " + (err.message || err));
+      showToast("Gagal membagikan file: " + (err.message || err), "error");
     }
   };
 
@@ -74,9 +76,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const content = event.target?.result as string;
         const newSettings = validateAndParseSettings(content);
         onUpdateSettings(newSettings);
-        alert("Pengaturan berhasil diimpor! Logo, posisi, dan teks telah diperbarui.");
+        showToast("Pengaturan berhasil diimpor!", "success");
       } catch (err: any) {
-        alert("Gagal impor: " + err.message);
+        showToast("Gagal impor: " + err.message, "error");
       }
     };
     reader.readAsText(file);
@@ -88,7 +90,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     // Security Check
     const code = prompt("Masukkan Kode Akses Area:");
     if (!code || code.toLowerCase() !== DEFAULT_ACCESS_CODE) {
-        alert("⛔ Akses Ditolak: Kode area salah.");
+        showToast("⛔ Akses Ditolak: Kode area salah.", "error");
         return;
     }
 
@@ -98,12 +100,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         const result = await syncSettingsFromWeb(webUrl);
         if (result.success && result.settings) {
             onUpdateSettings(result.settings);
-            alert("✅ " + result.message + "\nSelamat datang, Tim Kotabaru!");
+            showToast("✅ " + result.message, "success");
         } else {
-            alert("❌ " + result.message);
+            showToast("❌ " + result.message, "error");
         }
     } catch (e) {
-        alert("Terjadi kesalahan tidak terduga.");
+        showToast("Terjadi kesalahan tidak terduga.", "error");
     } finally {
         setIsSyncing(false);
     }
@@ -117,12 +119,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       try {
           const result = await uploadSettingsToWeb(uploadUrl, secret, settings);
           if (result.success) {
-              alert("✅ SUKSES: " + result.message);
+              showToast("✅ SUKSES: " + result.message, "success");
           } else {
-              alert("❌ GAGAL: " + result.message);
+              showToast("❌ GAGAL: " + result.message, "error");
           }
       } catch (e) {
-          alert("Error jaringan.");
+          showToast("Error jaringan.", "error");
       } finally {
           setIsUploading(false);
       }

@@ -64,3 +64,45 @@ export interface SavedPhoto {
   thumbnailWebviewPath?: string;  // Path webview untuk thumbnail (untuk ditampilkan di img tag)
   timestamp: number;
 }
+
+// --- Worker Types ---
+
+export interface WorkerConfig {
+  isFrontCamera: boolean;
+  resolution: 'high' | 'medium';
+  aspectRatio: '4:3' | '16:9';
+  showLogo: boolean;
+  posLogo: WatermarkPosition;
+  logoSize: WatermarkSize;
+  showQrCode: boolean;
+  posQr: WatermarkPosition;
+  qrSize: WatermarkSize;
+  companyName: string;
+  showCompany: boolean;
+  posCompany: WatermarkPosition;
+  projectName: string;
+  showProject: boolean;
+  posProject: WatermarkPosition;
+  showTime: boolean;
+  posTime: WatermarkPosition;
+  timeString: string;
+  showCoordinates: boolean;
+  posCoordinates: WatermarkPosition;
+  geoString: string;
+  itemOrder: WatermarkItemType[];
+  scaleConfig: Record<WatermarkSize, number>;
+  overlayScaleFactor: number;
+}
+
+export interface WorkerMessage {
+  sourceBitmap: ImageBitmap;
+  logoBitmap: ImageBitmap | null;
+  qrBitmap: ImageBitmap | null;
+  config: WorkerConfig;
+}
+
+export interface WorkerResponse {
+  success: boolean;
+  data?: string; // Base64 result
+  error?: string;
+}

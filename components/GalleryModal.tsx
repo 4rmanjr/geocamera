@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SavedPhoto } from '../types';
 import { XIcon, TrashIcon, ShareIcon, ChevronLeftIcon, DownloadIcon } from '../icons';
 import { deletePhoto, deleteAllPhotos, sharePhoto, exportToPublicGallery } from '../utils/storage';
+import { useToast } from '../contexts/ToastContext';
 
 interface GalleryModalProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
   selectedPhoto,
   onSelectPhoto,
 }) => {
+  const { showToast } = useToast();
+
   // Derived State (Single Source of Truth)
   const currentIndex = selectedPhoto 
     ? Math.max(0, photos.findIndex(p => p.filepath === selectedPhoto.filepath)) 
@@ -53,6 +56,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
         const newIndex = currentIndex >= updated.length ? updated.length - 1 : currentIndex;
         onSelectPhoto(updated[newIndex]);
       }
+      showToast("Foto dihapus", "success");
     }
   };
 
@@ -61,6 +65,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
         await deleteAllPhotos();
         setPhotos([]);
         onSelectPhoto(null);
+        showToast("Semua foto dihapus", "success");
     }
   }
 
@@ -70,6 +75,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
         await sharePhoto(photo);
     } catch(err) {
         console.error("Share failed", err);
+        showToast("Gagal membagikan foto", "error");
     }
   };
 
@@ -77,12 +83,10 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
     e.stopPropagation();
     try {
         await exportToPublicGallery(photo);
-        // We use alert here since we don't have access to the main toast context, 
-        // but it confirms the action to the user.
-        alert("Foto berhasil disimpan ke Galeri Utama!");
+        showToast("Foto berhasil disimpan ke Galeri Utama!", "success");
     } catch (err: any) {
         console.error("Export failed", err);
-        alert(err.message || "Gagal menyimpan foto");
+        showToast(err.message || "Gagal menyimpan foto", "error");
     }
   };
 

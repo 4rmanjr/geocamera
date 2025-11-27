@@ -1,5 +1,5 @@
 
-import { AppSettings, GeoLocationState } from '../types';
+import { AppSettings, GeoLocationState, WorkerConfig, WorkerMessage, WorkerResponse } from '../types';
 import QRCode from 'qrcode';
 import { WORKER_CODE } from './workerSource';
 import { formatGpsAccuracy, formatCurrentDate } from './formatting';
@@ -84,10 +84,10 @@ export const drawWatermark = async (
   return new Promise((resolve, reject) => {
     const w = getWorker();
     
-    const handler = (e: MessageEvent) => {
+    const handler = (e: MessageEvent<WorkerResponse>) => {
         w.removeEventListener('message', handler);
         if (e.data.success) {
-            resolve(e.data.data);
+            resolve(e.data.data!);
         } else {
             reject(new Error(e.data.error));
         }
@@ -95,7 +95,7 @@ export const drawWatermark = async (
     
     w.addEventListener('message', handler);
 
-    const config = {
+    const config: WorkerConfig = {
         isFrontCamera,
         resolution: settings.resolution,
         aspectRatio: settings.aspectRatio,
@@ -118,19 +118,21 @@ export const drawWatermark = async (
         posCoordinates: settings.posCoordinates,
         geoString,
         itemOrder: settings.itemOrder,
-        scaleConfig: WATERMARK_SCALES, // Pass scale config
-        overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium'] // Pass font scale factor
+        scaleConfig: WATERMARK_SCALES,
+        overlayScaleFactor: OVERLAY_SCALE_FACTORS[settings.overlaySize || 'medium']
+    };
+
+    const messagePayload: WorkerMessage = {
+        sourceBitmap,
+        logoBitmap,
+        qrBitmap,
+        config
     };
 
     const transferables: Transferable[] = [sourceBitmap];
     if (logoBitmap) transferables.push(logoBitmap);
     if (qrBitmap) transferables.push(qrBitmap);
 
-    w.postMessage({
-        sourceBitmap,
-        logoBitmap,
-        qrBitmap,
-        config
-    }, transferables);
+    w.postMessage(messagePayload, transferables);
   });
 };

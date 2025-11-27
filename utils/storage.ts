@@ -331,7 +331,7 @@ export const sharePhoto = async (photo: SavedPhoto) => {
         
     } catch (e) {
         console.error("Native share failed", e);
-        alert("Gagal membagikan foto: " + (e as any).message);
+        throw new Error("Gagal membagikan foto: " + (e as any).message);
     } finally {
         try {
             await Filesystem.deleteFile({
@@ -354,9 +354,10 @@ export const sharePhoto = async (photo: SavedPhoto) => {
             });
         } catch (e) {
              console.error("Browser share failed", e);
+             throw e;
         }
     } else {
-        alert("Sharing not supported in this browser environment.");
+        throw new Error("Sharing not supported in this browser environment.");
     }
   }
 };
