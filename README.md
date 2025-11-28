@@ -84,6 +84,29 @@ npx cap sync android
 npx cap open android
 ```
 
+### 5. Android Signing Configuration
+
+For releasing your Android application, it's crucial to set up proper code signing. To keep sensitive information like keystore passwords out of version control, we use your global `gradle.properties` file.
+
+**Steps:**
+
+1.  **Create/Edit Global `gradle.properties`:**
+    *   Locate or create the `gradle.properties` file in your home `.gradle` directory (e.g., `~/.gradle/gradle.properties` or `/home/yourusername/.gradle/gradle.properties`).
+    *   Add the following lines to this file, replacing the placeholder values with your actual keystore details:
+
+    ```properties
+    # Keystore properties for GeoCamPro release signing
+    MYAPP_RELEASE_STORE_FILE=/home/yourusername/keystore/your_keystore_name.jks
+    MYAPP_RELEASE_STORE_PASSWORD=your_store_password
+    MYAPP_RELEASE_KEY_ALIAS=your_key_alias
+    MYAPP_RELEASE_KEY_PASSWORD=your_key_password
+    ```
+    *   **Note:** The `yourusername` and `your_keystore_name.jks` should be replaced with your specific path and keystore filename. Ensure the path to your keystore file is correct.
+
+2.  **`android/app/build.gradle` Configuration:**
+    *   The project's `android/app/build.gradle` is already configured to automatically read these properties from your global `gradle.properties` file for release builds. You do not need to modify it.
+    *   **Security Reminder:** Never commit your `gradle.properties` file (especially the global one) to your version control system, as it contains sensitive credentials.
+
 ---
 
 ## 🌐 Server-Side Setup (Admin Sync)
