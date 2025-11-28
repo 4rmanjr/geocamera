@@ -112,7 +112,8 @@ const executeWorker = (
     addressLines: string[],
     timeString: string,
     geoState: GeoLocationState,
-    isFrontCamera: boolean
+    isFrontCamera: boolean,
+    rotation: number
 ): Promise<string> => {
     return new Promise((resolve, reject) => {
         const w = getWorker();
@@ -132,6 +133,7 @@ const executeWorker = (
             isFrontCamera,
             resolution: settings.resolution,
             aspectRatio: settings.aspectRatio,
+            rotation, // Pass rotation
             showLogo: settings.showLogo,
             posLogo: settings.posLogo,
             logoSize: settings.logoSize,
@@ -176,7 +178,8 @@ export const drawWatermark = async (
   source: HTMLVideoElement | string,
   settings: AppSettings,
   geoState: GeoLocationState,
-  isFrontCamera: boolean = false
+  isFrontCamera: boolean = false,
+  rotation: number = 0
 ): Promise<string> => {
   
   // 1. Prepare all resources in parallel where possible
@@ -201,6 +204,7 @@ export const drawWatermark = async (
       addressLines,
       timeString, 
       geoState, 
-      isFrontCamera
+      isFrontCamera,
+      rotation
   );
 };

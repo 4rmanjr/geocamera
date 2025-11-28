@@ -75,11 +75,30 @@ export const WORKER_CODE = `
       finalHeight = Math.floor(finalHeight * scale);
 
       // --- 4. CREATE CANVAS & DRAW ---
-      const canvas = new OffscreenCanvas(finalWidth, finalHeight);
+      const rotation = config.rotation || 0;
+      const isRotated = Math.abs(rotation) === 90;
+      const canvasWidth = isRotated ? finalHeight : finalWidth;
+      const canvasHeight = isRotated ? finalWidth : finalHeight;
+
+      const canvas = new OffscreenCanvas(canvasWidth, canvasHeight);
       const context = canvas.getContext('2d', { alpha: false });
       if (!context) throw new Error('Failed to create worker context');
 
-      context.save();
+      // --- DRAW IMAGE (ROTATED) ---
+      context.save(); // Start Image Rotation Block
+      
+      // 1. Move to center of destination canvas
+      context.translate(canvasWidth / 2, canvasHeight / 2);
+      
+      // 2. Rotate world to match device orientation
+      context.rotate(rotation * Math.PI / 180);
+      
+      // 3. Move back by half of the IMAGE size (unrotated)
+      // This aligns the center of the image content with the center of the canvas
+      context.translate(-finalWidth / 2, -finalHeight / 2); 
+
+      // Inner Transform for specific Image Content (Crop & Scale)
+      context.save(); 
       context.scale(scale, scale);
       context.translate(-cropX, -cropY);
 
@@ -98,11 +117,15 @@ export const WORKER_CODE = `
         }
         context.drawImage(sourceBitmap, 0, 0);
       }
-      context.restore();
+      context.restore(); // End Inner Transform
+      
+      context.restore(); // End Image Rotation Block - Context is now CLEAN/IDENTITY
 
-      // --- 5. DRAW WATERMARKS ---
-      const width = finalWidth;
-      const height = finalHeight;
+      // --- 5. DRAW WATERMARKS (UPRIGHT) ---
+      // Watermarks draw on the final canvas coordinates, so they are always upright relative to the final image.
+      const width = canvasWidth; 
+      const height = canvasHeight;
+      
       const padding = width * 0.04;
       const baseFontSize = width * 0.035 * (config.overlayScaleFactor || 1.0);
       const smallFontSize = baseFontSize * 0.75;

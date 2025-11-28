@@ -13,6 +13,7 @@ interface UseCaptureProps {
     geoState: GeoLocationState;
     captureImageNative: () => Promise<string | null>; // Function from useCamera
     addPhotoToGallery: (photo: SavedPhoto) => void;
+    uiRotation: number;
 }
 
 export const useCapture = ({
@@ -22,7 +23,8 @@ export const useCapture = ({
     settings,
     geoState,
     captureImageNative,
-    addPhotoToGallery
+    addPhotoToGallery,
+    uiRotation
 }: UseCaptureProps) => {
     const [isCapturing, setIsCapturing] = useState(false);
     const [effectState, setEffectState] = useState<'idle' | 'shutter' | 'flash'>('idle');
@@ -52,9 +54,9 @@ export const useCapture = ({
             let watermarkResult: string;
 
             if (isNative && nativeBase64) {
-                watermarkResult = await drawWatermark(nativeBase64, settings, geoState, isFrontCamera);
+                watermarkResult = await drawWatermark(nativeBase64, settings, geoState, isFrontCamera, uiRotation);
             } else {
-                watermarkResult = await drawWatermark(videoRef.current!, settings, geoState, isFrontCamera);
+                watermarkResult = await drawWatermark(videoRef.current!, settings, geoState, isFrontCamera, uiRotation);
             }
 
             // 3. Save to Storage

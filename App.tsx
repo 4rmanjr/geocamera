@@ -12,6 +12,7 @@ import { useCamera, requestCameraPermission } from './hooks/useCamera';
 import { useGeolocation, requestLocationPermission } from './hooks/useGeolocation';
 import { useGallery } from './hooks/useGallery';
 import { useCapture } from './hooks/useCapture';
+import { useDeviceOrientation } from './hooks/useDeviceOrientation';
 import { terminateWorker } from './utils/imageProcessing';
 
 const SETTINGS_KEY = 'geoCamSettings_v1';
@@ -55,6 +56,7 @@ const App = () => {
   const { videoRef, toggleCamera, toggleFlash, flashMode, isNative, captureImage, facingMode, error: cameraError } = useCamera({ isEnabled: permissionsReady });
   const geoState = useGeolocation({ isEnabled: permissionsReady });
   const { photos, setPhotos, addPhoto } = useGallery();
+  const { uiRotation } = useDeviceOrientation();
   
   // More UI State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -106,7 +108,8 @@ const App = () => {
       settings,
       geoState,
       captureImageNative: captureImage,
-      addPhotoToGallery: addPhoto
+      addPhotoToGallery: addPhoto,
+      uiRotation
   });
 
   // --- Back Button Handling ---
@@ -135,6 +138,11 @@ const App = () => {
       aspectRatio: settings.aspectRatio === '4:3' ? '3/4' : '9/16',
   });
 
+  const rotateStyle = {
+      transform: `rotate(${uiRotation}deg)`,
+      transition: 'transform 0.3s ease-out'
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-transparent overflow-hidden font-sans select-none">
       
@@ -150,6 +158,7 @@ const App = () => {
                 onClick={toggleFlash}
                 className="p-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition active:scale-95 flex items-center justify-center w-10 h-10"
                 title={`Flash: ${flashMode.toUpperCase()}`}
+                style={rotateStyle}
             >
               {flashMode === 'off' && <FlashOffIcon className="w-5 h-5 text-gray-400" />}
               {flashMode === 'on' && <FlashOnIcon className="w-5 h-5 text-yellow-400" />}
@@ -159,6 +168,7 @@ const App = () => {
             <button 
                 onClick={() => setIsSettingsOpen(true)}
                 className="p-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition active:scale-95 flex items-center justify-center w-10 h-10"
+                style={rotateStyle}
             >
               <SettingsIcon className="w-5 h-5" />
             </button>

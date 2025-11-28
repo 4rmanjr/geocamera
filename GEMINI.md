@@ -1,63 +1,65 @@
-# GeoCamera (GeoCamPro)
+# GeoCam Pro - Project Context
 
 ## Project Overview
-GeoCamPro is a specialized mobile camera application developed using React, Vite, and Capacitor. It is designed to capture photos with embedded metadata overlays, including geolocation (GPS coordinates), timestamps, and custom watermarks. The app mimics a professional viewfinder HUD and includes a built-in gallery for managing captures.
+**GeoCam Pro** is a professional-grade camera application built for field documentation, surveying, and reporting. It runs on Android via Capacitor and leverages React for the UI.
+Key capabilities include high-precision GPS tagging, customizable watermarked photos (Company Name, Project, Date/Time, GPS), secure cloud synchronization, and offline performance optimizations.
 
-## Tech Stack
-- **Frontend Framework:** React 19
-- **Language:** TypeScript
-- **Build Tool:** Vite
-- **Styling:** Tailwind CSS
-- **Mobile Runtime:** Capacitor 7 (focused on Android)
-- **State Management:** React Hooks (Context/Local State)
+### Tech Stack
+*   **Frontend:** React 19, Vite 6
+*   **Styling:** Tailwind CSS (via CDN/PostCSS)
+*   **Mobile Runtime:** Capacitor 7 (Android target)
+*   **State Management:** React Context & Custom Hooks
+*   **Backend:** PHP (for secure configuration and settings sync)
 
-## Key Features
-- **Camera Interface:** Custom viewfinder with grid lines, aspect ratio control, and flash settings.
-- **HUD Overlay:** Real-time display of GPS coordinates, date/time, compass direction, and altitude.
-- **Image Processing:** Canvas-based watermarking and metadata embedding.
-- **Gallery:** In-app photo viewing and management.
-- **Native Integration:** Uses Capacitor plugins for Camera Preview, Geolocation, Filesystem, and Media Store.
+## Directory Structure
+*   `App.tsx`: Main application entry point, handling UI layout, camera/gallery toggling, and initialization.
+*   `components/`: Reusable UI components (e.g., `CameraControls`, `HUDOverlay`, `SettingsModal`).
+*   `hooks/`: Custom hooks for device features (`useCamera`, `useGeolocation`, `useGallery`).
+*   `utils/`: Helper functions for image processing, storage, and formatting.
+*   `android/`: Native Android project files (Gradle, Manifest).
+*   `.env`: Environment variables (API URLs, keys).
 
 ## Building and Running
 
 ### Prerequisites
-- Node.js
-- Android Studio (for native deployment)
+*   Node.js & npm
+*   Android Studio (for native builds)
 
-### Scripts
-- **Install Dependencies:** `npm install`
-- **Start Local Dev Server:** `npm run dev`
-- **Build for Production:** `npm run build`
-- **Preview Production Build:** `npm run preview`
-
-### Mobile Development (Android)
-To sync changes and open the Android project:
-```bash
-npx cap sync android
-npx cap open android
-```
-
-## Architecture & Structure
-
-### Key Directories
-- **`/`**: Root configuration (`vite.config.ts`, `capacitor.config.ts`, `App.tsx`).
-- **`components/`**: UI components (`HUDOverlay`, `CameraControls`, `SettingsModal`, `GalleryModal`).
-- **`hooks/`**: Custom React hooks encapsulating logic (`useCamera`, `useGeolocation`, `useGallery`, `useCapture`).
-- **`utils/`**: Helper functions (`imageProcessing.ts`, `storage.ts`, `formatting.ts`).
-- **`android/`**: Native Android project files.
-
-### Entry Point
-The application entry point is `index.html`, which loads `index.tsx`. The main application logic resides in `App.tsx`, which orchestrates the camera view, HUD, and modal states.
+### Key Commands
+*   **Install Dependencies:**
+    ```bash
+    npm install
+    ```
+*   **Development Server:**
+    ```bash
+    npm run dev
+    ```
+*   **Build Web Assets:**
+    ```bash
+    npm run build
+    ```
+*   **Sync with Android Native:**
+    ```bash
+    npx cap sync android
+    ```
+*   **Open in Android Studio:**
+    ```bash
+    npx cap open android
+    ```
 
 ## Development Conventions
-- **Component Structure:** Functional components with hooks.
-- **Styling:** Tailwind CSS utility classes.
-- **Async/Await:** Used for all asynchronous operations (Camera API, filesystem).
-- **Lazy Loading:** Modals (`SettingsModal`, `GalleryModal`) are lazy-loaded to improve startup time.
 
-## Known Issues & Critical Findings
-**Refer to `code_review_findings.csv` for a detailed list of pending fixes.**
+### Code Style
+*   **React:** Functional components with Hooks.
+*   **Styling:** Tailwind CSS utility classes.
+*   **Icons:** Imported from `icons.tsx`.
+*   **Types:** Defined in `types.ts` and `constants.ts`.
 
-**Critical Android Configuration Errors:**
-1. **FileProvider Mismatch:** `android/app/src/main/res/xml/file_paths.xml` uses `<external-path>` but should use `<files-path>` to correctly map to the app's internal storage (`Directory.Data`). This causes crashes when sharing files.
-2. **Permissions:** `AndroidManifest.xml` declares legacy `READ/WRITE_EXTERNAL_STORAGE` permissions. These are largely ignored on Android 10+ (API 29+) due to Scoped Storage and should be removed in favor of specific Media Store APIs.
+### Architecture
+*   **Hardware Access:** Features like Camera and Geolocation are abstracted into custom hooks (`hooks/`) that handle permissions and fallback logic (e.g., web browser vs. native app).
+*   **Performance:** Heavy operations like image watermarking are offloaded to Web Workers to keep the UI responsive.
+*   **Configuration:** Sensitive settings (API keys) are managed via `.env` files. Application settings (like overlay layouts) are persisted using Capacitor Preferences.
+
+### Native Integration
+*   The app is designed to work primarily as a native Android app.
+*   Use `npx cap sync` after any `npm install` or asset changes to ensure the native project is up-to-date.

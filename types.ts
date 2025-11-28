@@ -77,6 +77,7 @@ export interface WorkerConfig {
   isFrontCamera: boolean;
   resolution: 'high' | 'medium';
   aspectRatio: '4:3' | '16:9';
+  rotation?: number; // Added rotation support
   showLogo: boolean;
   posLogo: WatermarkPosition;
   logoSize: WatermarkSize;
